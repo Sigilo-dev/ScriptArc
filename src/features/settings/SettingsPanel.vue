@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { Language, ThemeId } from "../../shared/types";
 import { AUTOMATIC_TIMING_LIMITS } from "../teleprompter/automaticTiming";
+import { translate, type UiTextKey } from "../../shared/localization";
 import { THEME_OPTIONS } from "./themes";
 
-defineProps<{
+const props = defineProps<{
+  interfaceLanguage: Language;
   theme: ThemeId;
   language: Language;
   wordsPerMinute: number;
@@ -14,6 +16,7 @@ defineProps<{
 
 const emit = defineEmits<{
   close: [];
+  "update:interfaceLanguage": [value: Language];
   "update:theme": [value: ThemeId];
   "update:language": [value: Language];
   "update:wordsPerMinute": [value: number];
@@ -21,24 +24,34 @@ const emit = defineEmits<{
   "update:countdownSeconds": [value: number];
   "update:hideControlsAutomatically": [value: boolean];
 }>();
+
+const t = (key: UiTextKey) => translate(props.interfaceLanguage, key);
+const themeLabelKeys: Record<ThemeId, UiTextKey> = {
+  white: "themeWhite",
+  gray: "themeGray",
+  orange: "themeOrange",
+  blue: "themeBlue",
+  pink: "themePink",
+  black: "themeBlack",
+};
 </script>
 
 <template>
   <section
     class="settings-panel"
-    aria-label="Preferencias de lectura"
+    :aria-label="t('settingsPanel')"
   >
     <div class="settings-heading">
       <div>
         <p class="settings-eyebrow">
-          Preferencias
+          {{ t('preferences') }}
         </p>
-        <h2>Personaliza tu lectura</h2>
+        <h2>{{ t('customizeReading') }}</h2>
       </div>
       <button
         type="button"
         class="settings-close"
-        aria-label="Cerrar configuración"
+        :aria-label="t('closeSettings')"
         @click="emit('close')"
       >
         ×
@@ -48,9 +61,9 @@ const emit = defineEmits<{
     <div
       class="settings-theme-picker"
       role="group"
-      aria-label="Tema"
+      :aria-label="t('theme')"
     >
-      <span class="settings-label">Tema</span>
+      <span class="settings-label">{{ t('theme') }}</span>
       <div class="theme-options">
         <button
           v-for="option in THEME_OPTIONS"
@@ -64,13 +77,24 @@ const emit = defineEmits<{
             class="theme-swatch"
             :style="{ backgroundColor: option.color }"
           />
-          <span>{{ option.label }}</span>
+          <span>{{ t(themeLabelKeys[option.id]) }}</span>
         </button>
       </div>
     </div>
 
     <label class="settings-field">
-      <span>Idioma automático predeterminado</span>
+      <span>{{ t('interfaceLanguage') }}</span>
+      <select
+        :value="interfaceLanguage"
+        @change="emit('update:interfaceLanguage', ($event.target as HTMLSelectElement).value as Language)"
+      >
+        <option value="es">Español</option>
+        <option value="en">English</option>
+      </select>
+    </label>
+
+    <label class="settings-field">
+      <span>{{ t('speakingLanguage') }}</span>
       <select
         :value="language"
         @change="emit('update:language', ($event.target as HTMLSelectElement).value as Language)"
@@ -81,7 +105,7 @@ const emit = defineEmits<{
     </label>
 
     <label class="settings-range">
-      <span><span>Ritmo automático predeterminado</span><output>{{ wordsPerMinute }} palabras/min</output></span>
+      <span><span>{{ t('automaticPace') }}</span><output>{{ wordsPerMinute }} {{ t('wordsPerMinute') }}</output></span>
       <input
         type="range"
         :min="AUTOMATIC_TIMING_LIMITS.minimumWordsPerMinute"
@@ -93,15 +117,15 @@ const emit = defineEmits<{
     </label>
 
     <label class="settings-field">
-      <span>Cuenta regresiva</span>
+      <span>{{ t('countdown') }}</span>
       <select
         :value="countdownSeconds"
         @change="emit('update:countdownSeconds', Number(($event.target as HTMLSelectElement).value))"
       >
-        <option :value="0">Sin cuenta regresiva</option>
-        <option :value="3">3 segundos</option>
-        <option :value="5">5 segundos</option>
-        <option :value="10">10 segundos</option>
+        <option :value="0">{{ t('noCountdown') }}</option>
+        <option :value="3">3 {{ t('seconds') }}</option>
+        <option :value="5">5 {{ t('seconds') }}</option>
+        <option :value="10">10 {{ t('seconds') }}</option>
       </select>
     </label>
 
@@ -111,11 +135,11 @@ const emit = defineEmits<{
         :checked="hideControlsAutomatically"
         @change="emit('update:hideControlsAutomatically', ($event.target as HTMLInputElement).checked)"
       >
-      <span>Ocultar controles al dejar de mover el cursor</span>
+      <span>{{ t('hideControls') }}</span>
     </label>
 
     <label class="settings-range">
-      <span><span>Tamaño de letra predeterminado</span><output>{{ fontSize }} px</output></span>
+      <span><span>{{ t('defaultFontSize') }}</span><output>{{ fontSize }} {{ t('pixels') }}</output></span>
       <input
         type="range"
         min="30"

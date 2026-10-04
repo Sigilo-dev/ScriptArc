@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { nextTick, ref } from "vue";
+import { translate, type UiTextKey } from "../../shared/localization";
+import type { Language } from "../../shared/types";
 
-defineProps<{ modelValue: string }>();
+const props = defineProps<{ modelValue: string; interfaceLanguage: Language }>();
 const emit = defineEmits<{ "update:modelValue": [value: string] }>();
+const t = (key: UiTextKey) => translate(props.interfaceLanguage, key);
 
 const textarea = ref<HTMLTextAreaElement | null>(null);
 
@@ -11,7 +14,7 @@ function wrapSelection(before: string, after: string) {
   if (!field) return;
   const start = field.selectionStart;
   const end = field.selectionEnd;
-  const selection = field.value.slice(start, end) || "texto";
+  const selection = field.value.slice(start, end) || (props.interfaceLanguage === "es" ? "texto" : "text");
   field.setRangeText(`${before}${selection}${after}`, start, end, "select");
   emit("update:modelValue", field.value);
   nextTick(() => {
@@ -48,13 +51,13 @@ function updateText(event: Event) {
     <div
       class="markdown-toolbar"
       role="toolbar"
-      aria-label="Formato Markdown"
+      :aria-label="t('markdownToolbar')"
     >
       <button
         type="button"
         class="format-button"
-        aria-label="Insertar título"
-        title="Título"
+        :aria-label="t('insertHeading')"
+        :title="t('heading')"
         @mousedown.prevent
         @click="addHeading"
       >
@@ -67,8 +70,8 @@ function updateText(event: Event) {
       <button
         type="button"
         class="format-button format-strong"
-        aria-label="Insertar negrita"
-        title="Negrita"
+        :aria-label="t('insertBold')"
+        :title="t('bold')"
         @mousedown.prevent
         @click="wrapSelection('**', '**')"
       >
@@ -77,8 +80,8 @@ function updateText(event: Event) {
       <button
         type="button"
         class="format-button format-italic"
-        aria-label="Insertar cursiva"
-        title="Cursiva"
+        :aria-label="t('insertItalic')"
+        :title="t('italic')"
         @mousedown.prevent
         @click="wrapSelection('*', '*')"
       >
@@ -87,8 +90,8 @@ function updateText(event: Event) {
       <button
         type="button"
         class="format-button format-strike"
-        aria-label="Insertar tachado"
-        title="Tachado"
+        :aria-label="t('insertStrike')"
+        :title="t('strikethrough')"
         @mousedown.prevent
         @click="wrapSelection('~~', '~~')"
       >
@@ -99,13 +102,13 @@ function updateText(event: Event) {
     <label
       class="sr-only"
       for="script-source"
-    >Texto en Markdown</label>
+    >{{ t('markdownText') }}</label>
     <textarea
       id="script-source"
       ref="textarea"
       class="script-input"
       :value="modelValue"
-      placeholder="Coloca tu texto aquí..."
+      :placeholder="t('scriptPlaceholder')"
       spellcheck="true"
       @input="updateText"
     />

@@ -10,6 +10,7 @@ import { parseMarkdown } from "../markdown/parseMarkdown";
 export const CURRENT_PROJECT_FORMAT = 2 as const;
 
 export const defaultUserPreferences: UserPreferences = {
+  interfaceLanguage: "es",
   theme: "white",
   defaultFontSize: 56,
   defaultWordsPerMinute: 160,

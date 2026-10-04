@@ -12,10 +12,23 @@ class MemoryStorage {
 describe("user preferences", () => {
   it("stores and reloads separate validated preferences", () => {
     const storage = new MemoryStorage();
-    const settings = { ...defaultUserPreferences, theme: "blue" as const, countdownSeconds: 3, hideControlsAutomatically: false };
+    const settings = {
+      ...defaultUserPreferences,
+      interfaceLanguage: "en" as const,
+      theme: "blue" as const,
+      countdownSeconds: 3,
+      hideControlsAutomatically: false,
+    };
     saveUserPreferences(settings, storage);
     expect(storage.getItem(USER_PREFERENCES_KEY)).toContain('"theme":"blue"');
     expect(loadUserPreferences(storage)).toEqual(settings);
+  });
+
+  it("defaults the interface to Spanish and rejects an unsupported interface language", () => {
+    const storage = new MemoryStorage();
+    expect(loadUserPreferences(storage).interfaceLanguage).toBe("es");
+    storage.setItem(USER_PREFERENCES_KEY, JSON.stringify({ interfaceLanguage: "fr" }));
+    expect(loadUserPreferences(storage).interfaceLanguage).toBe("es");
   });
 
   it("resets corrupt values and clamps well-formed but out of range preferences", () => {

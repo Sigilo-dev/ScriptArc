@@ -20,6 +20,8 @@ Este archivo recoge decisiones y correcciones que deben mantenerse durante el de
 - El pacing automático mide la longitud de la pronunciación derivada (no el Markdown ni el rótulo numérico), escala con palabras por minuto, añade pausas de puntuación y limita cada palabra a 250–8000 ms para prevenir tiempos extremos.
 - El tema y los valores predeterminados de idioma, ritmo y tamaño pertenecen al usuario; el proyecto conserva sus propios idioma, ritmo y tamaño. Los seis temas usan las mismas variables CSS; blanco es el valor inicial.
 - Mantener organización pequeña por feature; evitar capas ceremoniales y dependencias que no resuelvan una necesidad del producto.
+- La interfaz se localiza con un diccionario ES/EN y conserva la preferencia en el almacenamiento del usuario; el selector ES/EN queda visible desde el editor inicial, separado del idioma del guion y de su conversión numérica.
+- Las instrucciones de RECORD usan glifos de teclas (→, ← y una barra espaciadora dibujada), con nombres traducidos solo como etiquetas accesibles. Durante la cuenta regresiva manual, Space o → omiten la espera y ejecutan RECORD; Escape la cancela.
 
 ## Problemas encontrados y solución
 

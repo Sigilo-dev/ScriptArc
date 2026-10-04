@@ -16,6 +16,7 @@ The portable ZIP contains the runnable application and its license/readme. It is
 ## What it includes
 
 - Automatic word-level pacing in Spanish and English, including number-aware spoken timing.
+- Interface available in Spanish and English, switchable from the first screen.
 - Manual timing recording and playback controls.
 - Markdown scripts with headings, emphasis, links and punctuation-aware word steps.
 - Versioned `.scriptarc` project files, local recovery and six configurable themes.
@@ -28,11 +29,11 @@ Vue 3 and TypeScript power the interface, Vite builds the frontend, Tauri 2 and 
 
 ## Use ScriptArc
 
-1. Paste or write a Markdown script in the editor.
-2. Choose **Automático** for generated timing or **Manual** to record your pace. In manual mode, read the highlighted word and press **→** when you finish each word; stop to review the recorded timings.
+1. Paste or write a Markdown script in the editor. Change the interface language at any time with **ES / EN** in the top bar.
+2. Choose **Automatic** for generated timing or **Manual** to record your pace. In manual mode, read the highlighted word and press **→** or **Space** when you finish each word; stop to review the recorded timings.
 3. In the teleprompter, use **Space** to play/pause, **← / →** to move by word, **Home / End** to seek, and **Esc** to leave fullscreen. Press **Esc** again to return to the editor.
-4. Use **Guardar**, **Guardar como…** or **Abrir proyecto** to continue later from a `.scriptarc` file. The project stores reading position and timings; changes are recovered locally if the app closes unexpectedly.
-5. Open settings to choose a theme, default language and speed, text size, countdown, and control visibility.
+4. Use **Save**, **Save as…** or **Open project** to continue later from a `.scriptarc` file. The project stores reading position and timings; changes are recovered locally if the app closes unexpectedly.
+5. Open settings to choose a theme, default number language and speed, text size, countdown, and control visibility. Interface labels follow the selected language.
 
 ## Develop and build
 

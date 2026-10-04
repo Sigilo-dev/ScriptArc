@@ -22,6 +22,7 @@ export interface TeleprompterPreferences {
 }
 
 export interface UserPreferences {
+  interfaceLanguage: Language;
   theme: ThemeId;
   defaultFontSize: number;
   defaultWordsPerMinute: number;

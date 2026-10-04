@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { nextTick, onMounted, watch } from "vue";
+import { translate, type UiTextKey } from "../../shared/localization";
+import type { Language } from "../../shared/types";
 import type { MarkdownBlock, ReadingWord } from "../../shared/types";
 
 const props = defineProps<{
   blocks: MarkdownBlock[];
   words: ReadingWord[];
   cursor: number;
+  interfaceLanguage: Language;
 }>();
+const t = (key: UiTextKey) => translate(props.interfaceLanguage, key);
 
 const wordElements = new Map<number, HTMLElement>();
 let lastAppliedCursor = -1;
@@ -53,7 +57,7 @@ onMounted(() => syncCursor(true));
 <template>
   <section
     class="prompter-view"
-    aria-label="Teleprompter"
+    :aria-label="t('prompter')"
   >
     <div
       v-if="words.length"
@@ -83,7 +87,7 @@ onMounted(() => syncCursor(true));
       v-else
       class="empty-prompter"
     >
-      Vuelve al editor y coloca tu texto.
+      {{ t('emptyPrompter') }}
     </p>
   </section>
 </template>

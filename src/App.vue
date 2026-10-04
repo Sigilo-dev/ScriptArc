@@ -27,6 +27,7 @@ import SettingsPanel from "./features/settings/SettingsPanel.vue";
 import { loadUserPreferences, saveUserPreferences } from "./features/settings/userPreferences";
 import TeleprompterText from "./features/teleprompter/TeleprompterText.vue";
 import { formatPlaybackTime } from "./features/teleprompter/playbackState";
+import { translate, translateErrorMessage, type UiTextKey } from "./shared/localization";
 import { usePlayback } from "./features/teleprompter/usePlayback";
 import type { Language, ReadingWord, TimingMode, UserPreferences } from "./shared/types";
 
@@ -35,11 +36,12 @@ type UnsavedChoice = "save" | "discard" | "cancel";
 
 const screen = ref<Screen>("editor");
 const userPreferences = ref(loadUserPreferences());
+const t = (key: UiTextKey, values: Record<string, string | number> = {}) => translate(userPreferences.value.interfaceLanguage, key, values);
 const project = ref(createProject("", new Date(), userPreferences.value));
 const filePath = ref<string | null>(null);
 const savedFingerprint = ref(projectFingerprint(project.value));
 const hasUnsavedChanges = ref(false);
-const displayFileName = computed(() => filePath.value?.split(/[\\/]/u).pop() ?? "Proyecto nuevo");
+const displayFileName = computed(() => filePath.value?.split(/[\\/]/u).pop() ?? t("unsavedProject"));
 const sourceMarkdown = computed({
   get: () => project.value.sourceMarkdown,
   set: (markdown: string) => {
@@ -50,7 +52,7 @@ const sourceMarkdown = computed({
       hasUnsavedChanges.value = true;
       playback.seek(0);
     }
-    if (sourceChanged && hadTimings) showNotice("El texto cambió; se eliminaron los tiempos manuales para no asignarlos a otras palabras.");
+    if (sourceChanged && hadTimings) showNotice(t("manualTimingsDiscarded"));
   },
 });
 const timingMode = computed(() => project.value.timingMode);
@@ -70,6 +72,7 @@ const appRoot = ref<HTMLElement | null>(null);
 const controlsVisible = ref(true);
 const isFullscreen = ref(false);
 const countdown = ref<number | null>(null);
+const countdownPurpose = ref<"playback" | "recording" | null>(null);
 const appReady = ref(false);
 const unsavedDialogOpen = ref(false);
 let unsavedChoiceResolver: ((choice: UnsavedChoice) => void) | null = null;
@@ -78,6 +81,7 @@ let closeListener: (() => void) | undefined;
 let noticeTimeout: number | undefined;
 let controlsHideTimeout: number | undefined;
 let countdownTimer: number | undefined;
+let pendingCountdownAction: (() => void) | null = null;
 let recoveryTimer: number | undefined;
 let focusBeforeDialog: HTMLElement | null = null;
 let lastRecoveryWriteAt = 0;
@@ -103,7 +107,7 @@ watch(userPreferences, (value) => {
   try {
     saveUserPreferences(value);
   } catch {
-    showNotice("No se pudieron guardar las preferencias en este dispositivo.");
+    showNotice(t("preferencesUnavailable"));
   }
 }, { deep: true });
 
@@ -129,7 +133,7 @@ function persistRecoveryDraft(value = project.value) {
     }
     else clearRecoveryDraft();
   } catch {
-    showNotice("No se pudo guardar la recuperación local; guarda el proyecto para proteger tus cambios.");
+    showNotice(t("recoverySaveFailed"));
   }
 }
 
@@ -243,9 +247,9 @@ async function openProject() {
     filePath.value = opened.filePath;
     playback.seek(opened.project.lastPosition);
     screen.value = "editor";
-    showNotice(`Proyecto abierto: ${opened.project.title}`);
+    showNotice(t("openNotice", { title: opened.project.title }));
   } catch (error) {
-    showNotice(error instanceof Error ? error.message : "No se pudo abrir el proyecto.");
+    showNotice(error instanceof Error ? translateErrorMessage(error.message, userPreferences.value.interfaceLanguage) : t("noProjectOpen"));
   }
 }
 
@@ -259,10 +263,10 @@ async function saveProject(saveAs = false): Promise<boolean> {
     savedFingerprint.value = projectFingerprint(updated);
     hasUnsavedChanges.value = false;
     clearRecoveryDraft();
-    showNotice("Proyecto guardado.");
+    showNotice(t("saveNotice"));
     return true;
   } catch (error) {
-    showNotice(error instanceof Error ? error.message : "No se pudo guardar el proyecto.");
+    showNotice(error instanceof Error ? translateErrorMessage(error.message, userPreferences.value.interfaceLanguage) : t("saveFailed"));
     return false;
   }
 }
@@ -276,9 +280,16 @@ async function requestWindowClose() {
 
 function handlePrompterKey(event: KeyboardEvent) {
   if (screen.value !== "teleprompter") return;
+  if (countdown.value !== null) {
+    if (event.key === "Escape") cancelCountdown();
+    else if (event.key === " " || event.key === "ArrowRight") {
+      event.preventDefault();
+      skipCountdown();
+    }
+    return;
+  }
   const target = event.target;
   if (target instanceof HTMLElement && target.closest("input, textarea, select, [contenteditable='true'], button")) return;
-  if (countdown.value !== null && event.key !== "Escape") return;
 
   switch (event.key) {
     case " ":
@@ -303,8 +314,7 @@ function handlePrompterKey(event: KeyboardEvent) {
       if (!isRecording.value && !(timingMode.value === "manual" && manualSession.value.status === "ready")) playback.seek(words.value.length);
       break;
     case "Escape":
-      if (countdown.value !== null) cancelCountdown();
-      else if (document.fullscreenElement) {
+      if (document.fullscreenElement) {
         event.preventDefault();
         void document.exitFullscreen();
       } else if (!isFullscreen.value) returnToEditor();
@@ -345,8 +355,8 @@ onMounted(async () => {
     const recovery = loadRecoveryDraft();
     if (!recovery) return;
     const shouldRestore = isTauri()
-      ? await ask("Se encontró una sesión recuperable con cambios que no se guardaron. ¿Quieres restaurarla?", { title: "Recuperar proyecto", kind: "warning" })
-      : window.confirm("Se encontró una sesión recuperable. ¿Quieres restaurarla?");
+      ? await ask(t("restorePrompt"), { title: t("restoreTitle"), kind: "warning" })
+      : window.confirm(t("restorePrompt"));
     if (shouldRestore) {
       validateManualTimingIndices(recovery.project);
       project.value = recovery.project;
@@ -355,12 +365,12 @@ onMounted(async () => {
       hasUnsavedChanges.value = true;
       manualSession.value = createManualRecordingSession(parseMarkdown(recovery.project.sourceMarkdown).tokens.length, recovery.project.manualTimings);
       playback.seek(recovery.project.lastPosition);
-      showNotice("Sesión recuperada. Guarda el proyecto para conservar los cambios.");
+      showNotice(t("recoveryRestored"));
     } else {
       clearRecoveryDraft();
     }
   } catch (error) {
-    showNotice(error instanceof Error ? error.message : "No se pudo preparar la sesión local.");
+    showNotice(error instanceof Error ? translateErrorMessage(error.message, userPreferences.value.interfaceLanguage) : t("prepareFailed"));
   } finally {
     appReady.value = true;
   }
@@ -424,18 +434,19 @@ function retreat() {
   playback.previous();
 }
 
-function runWithCountdown(action: () => void) {
+function runWithCountdown(action: () => void, purpose: "playback" | "recording") {
   cancelCountdown();
   const seconds = userPreferences.value.countdownSeconds;
   if (seconds <= 0) {
     action();
     return;
   }
+  pendingCountdownAction = action;
+  countdownPurpose.value = purpose;
   countdown.value = seconds;
   countdownTimer = window.setInterval(() => {
     if (countdown.value === null || countdown.value <= 1) {
-      cancelCountdown();
-      action();
+      completeCountdown();
     } else {
       countdown.value -= 1;
     }
@@ -446,6 +457,22 @@ function cancelCountdown() {
   if (countdownTimer !== undefined) window.clearInterval(countdownTimer);
   countdownTimer = undefined;
   countdown.value = null;
+  countdownPurpose.value = null;
+  pendingCountdownAction = null;
+}
+
+function skipCountdown() {
+  if (countdown.value !== null) completeCountdown();
+}
+
+function completeCountdown() {
+  if (countdownTimer !== undefined) window.clearInterval(countdownTimer);
+  countdownTimer = undefined;
+  countdown.value = null;
+  countdownPurpose.value = null;
+  const action = pendingCountdownAction;
+  pendingCountdownAction = null;
+  action?.();
 }
 
 function beginRecording() {
@@ -455,7 +482,7 @@ function beginRecording() {
   project.value = { ...project.value, timingMode: "manual", manualTimings: [] };
   hasUnsavedChanges.value = true;
   playback.restart();
-  showNotice("Grabando. Lee la palabra blanca y pulsa → al terminar.");
+  showNotice(t("recordingStarted"));
 }
 
 function toggleRecording() {
@@ -467,7 +494,7 @@ function toggleRecording() {
     cancelCountdown();
     return;
   }
-  runWithCountdown(beginRecording);
+  runWithCountdown(beginRecording, "recording");
 }
 
 function recordCurrentWord() {
@@ -479,7 +506,7 @@ function recordCurrentWord() {
   project.value = { ...project.value, manualTimings: manualSession.value.timings };
   hasUnsavedChanges.value = true;
   playback.seek(manualSession.value.cursor);
-  if (manualSession.value.status === "review") showNotice("Ritmo manual grabado. Puedes revisar, reproducir o volver a grabar.");
+  if (manualSession.value.status === "review") showNotice(t("recordingDone"));
 }
 
 function stopRecording(captureCurrentWord = false) {
@@ -490,7 +517,7 @@ function stopRecording(captureCurrentWord = false) {
   project.value = { ...project.value, manualTimings: manualSession.value.timings };
   hasUnsavedChanges.value = true;
   playback.seek(manualSession.value.cursor);
-  if (captureCurrentWord) showNotice("Grabación detenida. Puedes revisar, editar o reproducir el ritmo registrado.");
+  if (captureCurrentWord) showNotice(t("recordingStopped"));
 }
 
 function togglePlayback() {
@@ -505,10 +532,10 @@ function togglePlayback() {
   if (isRecording.value) stopRecording();
   if (!words.value.length) return;
   if (timingMode.value === "manual" && !project.value.manualTimings.length) {
-    showNotice("Graba primero tu ritmo con el botón RECORD.");
+    showNotice(t("recordFirst"));
     return;
   }
-  runWithCountdown(playback.play);
+  runWithCountdown(playback.play, "playback");
 }
 
 function playbackDuration(word: ReadingWord): number {
@@ -531,6 +558,7 @@ function adjustFontSize(amount: number) {
 }
 
 function updateTheme(value: UserPreferences["theme"]) { userPreferences.value.theme = value; }
+function updateInterfaceLanguage(value: Language) { userPreferences.value.interfaceLanguage = value; }
 function updateLanguage(value: Language) { userPreferences.value.defaultLanguage = value; }
 function selectProjectLanguage(value: Language) {
   if (project.value.automaticTiming.language !== value) hasUnsavedChanges.value = true;
@@ -548,7 +576,7 @@ async function toggleFullscreen() {
     if (document.fullscreenElement) await document.exitFullscreen();
     else await appRoot.value?.requestFullscreen();
   } catch {
-    showNotice("El sistema no permitió cambiar a pantalla completa.");
+    showNotice(t("fullscreenError"));
   }
 }
 </script>
@@ -566,14 +594,14 @@ async function toggleFullscreen() {
       role="status"
       aria-live="polite"
     >
-      Preparando ScriptArc…
+      {{ t('startup') }}
     </div>
     <template v-if="screen === 'editor'">
       <header class="topbar">
         <a
           class="brand"
           href="#"
-          aria-label="ScriptArc inicio"
+          :aria-label="t('home')"
           @click.prevent="returnToEditor"
         >
           <span
@@ -584,13 +612,24 @@ async function toggleFullscreen() {
         </a>
         <span
           class="project-status"
-          :title="filePath ?? 'Proyecto todavía no guardado'"
+          :title="filePath ?? t('unsavedProject')"
         >{{ displayFileName }}{{ hasUnsavedChanges ? " •" : "" }}</span>
+        <label class="interface-language-picker">
+          <span class="sr-only">{{ t('interfaceLanguage') }}</span>
+          <select
+            :value="userPreferences.interfaceLanguage"
+            :aria-label="t('interfaceLanguage')"
+            @change="updateInterfaceLanguage(($event.target as HTMLSelectElement).value as Language)"
+          >
+            <option value="es">ES</option>
+            <option value="en">EN</option>
+          </select>
+        </label>
         <button
           class="icon-button"
           type="button"
-          aria-label="Configuración"
-          title="Configuración"
+          :aria-label="t('settings')"
+          :title="t('settings')"
           :aria-expanded="settingsOpen"
           @click="settingsOpen = !settingsOpen"
         >
@@ -599,12 +638,14 @@ async function toggleFullscreen() {
       </header>
       <SettingsPanel
         v-if="settingsOpen"
+        :interface-language="userPreferences.interfaceLanguage"
         :theme="userPreferences.theme"
         :language="userPreferences.defaultLanguage"
         :words-per-minute="userPreferences.defaultWordsPerMinute"
         :font-size="userPreferences.defaultFontSize"
         :countdown-seconds="userPreferences.countdownSeconds"
         :hide-controls-automatically="userPreferences.hideControlsAutomatically"
+        @update:interface-language="updateInterfaceLanguage"
         @update:theme="updateTheme"
         @update:language="updateLanguage"
         @update:words-per-minute="updateWordsPerMinute"
@@ -616,19 +657,22 @@ async function toggleFullscreen() {
 
       <section
         class="editor-view"
-        aria-label="Editor de guion"
+        :aria-label="t('editorAria')"
       >
         <div class="editor-heading">
           <p class="eyebrow">
-            Tu próximo guion empieza aquí
+            {{ t('eyebrow') }}
           </p>
-          <h1>Escribe con claridad.<br><span>Lee con confianza.</span></h1>
+          <h1>{{ t('writeClearly') }}<br><span>{{ t('readConfidently') }}</span></h1>
           <p class="document-title">
-            {{ project.title }}
+            {{ project.sourceMarkdown.trim() ? project.title : t('untitledScript') }}
           </p>
         </div>
 
-        <ScriptEditor v-model="sourceMarkdown" />
+        <ScriptEditor
+          v-model="sourceMarkdown"
+          :interface-language="userPreferences.interfaceLanguage"
+        />
 
         <div class="editor-actions">
           <div class="primary-actions">
@@ -639,7 +683,7 @@ async function toggleFullscreen() {
               :aria-expanded="automaticLanguagePicker"
               @click="automaticLanguagePicker = !automaticLanguagePicker"
             >
-              Automático <span aria-hidden="true">→</span>
+              {{ t('automatic') }} <span aria-hidden="true">→</span>
             </button>
             <button
               class="button button-secondary"
@@ -647,7 +691,7 @@ async function toggleFullscreen() {
               :disabled="!sourceMarkdown.trim()"
               @click="start('manual')"
             >
-              Manual
+              {{ t('manual') }}
             </button>
           </div>
           <div class="file-actions">
@@ -656,14 +700,14 @@ async function toggleFullscreen() {
               type="button"
               @click="createNewProject"
             >
-              Nuevo
+              {{ t('newProject') }}
             </button>
             <button
               class="text-button"
               type="button"
               @click="openProject"
             >
-              Abrir proyecto
+              {{ t('openProject') }}
             </button>
             <button
               class="text-button"
@@ -671,14 +715,14 @@ async function toggleFullscreen() {
               :disabled="!hasUnsavedChanges && filePath !== null"
               @click="saveProject()"
             >
-              Guardar
+              {{ t('save') }}
             </button>
             <button
               class="text-button"
               type="button"
               @click="saveProject(true)"
             >
-              Guardar como…
+              {{ t('saveAs') }}
             </button>
           </div>
         </div>
@@ -687,7 +731,7 @@ async function toggleFullscreen() {
           class="language-choice"
         >
           <label>
-            <span>Idioma para leer los números</span>
+            <span>{{ t('numberLanguage') }}</span>
             <select
               :value="project.automaticTiming.language"
               @change="selectProjectLanguage(($event.target as HTMLSelectElement).value as Language)"
@@ -697,14 +741,14 @@ async function toggleFullscreen() {
             </select>
           </label>
           <label class="settings-range project-speed">
-            <span><span>Ritmo de este guion</span><output>{{ project.automaticTiming.wordsPerMinute }} palabras/min</output></span>
+            <span><span>{{ t('projectPace') }}</span><output>{{ project.automaticTiming.wordsPerMinute }} {{ t('wordsPerMinute') }}</output></span>
             <input
               type="range"
               min="80"
               max="240"
               step="5"
               :value="project.automaticTiming.wordsPerMinute"
-              aria-label="Ritmo automático de este guion"
+              :aria-label="t('projectPace')"
               @input="updateProjectWordsPerMinute(Number(($event.target as HTMLInputElement).value))"
             >
           </label>
@@ -713,11 +757,11 @@ async function toggleFullscreen() {
             type="button"
             @click="start('automatic')"
           >
-            Empezar <span aria-hidden="true">→</span>
+            {{ t('start') }} <span aria-hidden="true">→</span>
           </button>
         </div>
         <p class="editor-hint">
-          Pega o escribe tu texto; tus palabras siempre se quedan contigo.
+          {{ t('editorHint') }}
         </p>
         <p
           class="notice"
@@ -728,7 +772,7 @@ async function toggleFullscreen() {
         </p>
       </section>
       <footer class="app-footer">
-        <span>Hecho para que tus ideas fluyan.</span>
+        <span>{{ t('footer') }}</span>
       </footer>
     </template>
 
@@ -742,16 +786,16 @@ async function toggleFullscreen() {
           type="button"
           @click="returnToEditor"
         >
-          ← Editor
+          {{ t('editorButton') }}
         </button>
         <span class="mode-label">
-          {{ timingMode === "automatic" ? "Modo automático" : "Modo manual" }}{{ isRecording ? " · Grabando" : "" }}
+          {{ timingMode === "automatic" ? t('autoMode') : t('manualMode') }}{{ isRecording ? ` · ${t('recording')}` : "" }}
         </span>
         <button
           class="icon-button"
           type="button"
-          aria-label="Configuración"
-          title="Configuración"
+          :aria-label="t('settings')"
+          :title="t('settings')"
           :aria-expanded="settingsOpen"
           @click="settingsOpen = !settingsOpen"
         >
@@ -760,12 +804,14 @@ async function toggleFullscreen() {
       </header>
       <SettingsPanel
         v-if="settingsOpen"
+        :interface-language="userPreferences.interfaceLanguage"
         :theme="userPreferences.theme"
         :language="userPreferences.defaultLanguage"
         :words-per-minute="userPreferences.defaultWordsPerMinute"
         :font-size="userPreferences.defaultFontSize"
         :countdown-seconds="userPreferences.countdownSeconds"
         :hide-controls-automatically="userPreferences.hideControlsAutomatically"
+        @update:interface-language="updateInterfaceLanguage"
         @update:theme="updateTheme"
         @update:language="updateLanguage"
         @update:words-per-minute="updateWordsPerMinute"
@@ -780,20 +826,36 @@ async function toggleFullscreen() {
         role="status"
         aria-live="assertive"
       >
-        <span>Comenzamos en</span>
+        <span>{{ countdownPurpose === "recording" ? t('preparingRecording') : t('startingSoon') }}</span>
         <strong>{{ countdown }}</strong>
+        <p
+          v-if="countdownPurpose === 'recording'"
+          class="countdown-key-hint"
+        >
+          <span>{{ t('skipCountdownWith') }}</span>
+          <kbd
+            role="img"
+            :aria-label="t('keyArrowRight')"
+          >→</kbd>
+          <kbd
+            class="keycap-space"
+            role="img"
+            :aria-label="t('keySpace')"
+          ><span aria-hidden="true" /></kbd>
+        </p>
         <button
           class="button button-secondary"
           type="button"
-          @click="cancelCountdown"
+          @click="skipCountdown"
         >
-          Cancelar
+          {{ t('skip') }}
         </button>
       </div>
       <TeleprompterText
         :blocks="parsedMarkdown.blocks"
         :words="words"
         :cursor="cursor"
+        :interface-language="userPreferences.interfaceLanguage"
       />
       <p
         class="notice notice-dark"
@@ -805,7 +867,7 @@ async function toggleFullscreen() {
       <footer
         class="prompter-controls"
         :class="{ 'controls-hidden': !controlsVisible }"
-        aria-label="Controles del teleprompter"
+        :aria-label="t('controls')"
       >
         <div class="playback-progress">
           <span>{{ formatPlaybackTime(elapsedMilliseconds) }}</span>
@@ -817,7 +879,7 @@ async function toggleFullscreen() {
             :value="cursor"
             :style="{ '--progress': `${progressPercent}%` }"
             :disabled="isRecording || (timingMode === 'manual' && manualSession.status === 'ready')"
-            aria-label="Progreso de lectura"
+            :aria-label="t('readingProgress')"
             @input="seekFromProgress"
           >
           <span>-{{ formatPlaybackTime(remainingMilliseconds) }}</span>
@@ -826,14 +888,45 @@ async function toggleFullscreen() {
           v-if="timingMode === 'manual'"
           class="manual-instruction"
         >
-          {{ isRecording ? "Lee la palabra blanca y pulsa → al terminarla; ← vuelve una palabra y permite repetirla." : manualSession.status === "review" ? "Grabación lista para revisar o reproducir; RECORD vuelve a empezar." : "Sitúate en la primera palabra y pulsa RECORD para medir tu ritmo." }}
+          <template v-if="isRecording">
+            {{ t('advanceWord') }}
+            <kbd
+              role="img"
+              :aria-label="t('keyArrowRight')"
+            >→</kbd>
+            <kbd
+              class="keycap-space"
+              role="img"
+              :aria-label="t('keySpace')"
+            ><span aria-hidden="true" /></kbd>
+            <span class="keystroke-separator">·</span>
+            {{ t('retreatWord') }} <kbd
+              role="img"
+              :aria-label="t('keyArrowLeft')"
+            >←</kbd>
+          </template>
+          <template v-else-if="manualSession.status === 'review'">
+            {{ t('recordingReady') }}
+          </template>
+          <template v-else>
+            {{ t('startRecordingHint') }}
+            <kbd
+              role="img"
+              :aria-label="t('keyArrowRight')"
+            >→</kbd>
+            <kbd
+              class="keycap-space"
+              role="img"
+              :aria-label="t('keySpace')"
+            ><span aria-hidden="true" /></kbd>
+          </template>
         </p>
         <div class="control-buttons">
           <button
             class="button button-secondary"
             type="button"
-            aria-label="Reiniciar"
-            title="Reiniciar (Inicio)"
+            :aria-label="t('restart')"
+            :title="`${t('restart')} (Home)`"
             :disabled="isRecording || countdown !== null"
             @click="playback.restart"
           >
@@ -842,8 +935,8 @@ async function toggleFullscreen() {
           <button
             class="button button-secondary"
             type="button"
-            aria-label="Palabra anterior"
-            title="Anterior (←)"
+            :aria-label="t('previousWord')"
+            :title="`${t('previousWord')} (←)`"
             @click="retreat"
           >
             ←
@@ -856,7 +949,7 @@ async function toggleFullscreen() {
             :disabled="!words.length || countdown !== null"
             @click="toggleRecording"
           >
-            {{ isRecording ? "■ DETENER" : manualSession.status === "review" ? "● REGRABAR" : "● RECORD" }}
+            {{ isRecording ? t('stopRecording') : manualSession.status === "review" ? t('rerecord') : t('record') }}
           </button>
           <button
             v-if="timingMode === 'automatic' || project.manualTimings.length > 0"
@@ -865,13 +958,13 @@ async function toggleFullscreen() {
             :disabled="!words.length || (timingMode === 'manual' && (!project.manualTimings.length || isRecording))"
             @click="togglePlayback"
           >
-            {{ isPlaying ? "Pausa" : "Play" }}
+            {{ isPlaying ? t('pause') : t('play') }}
           </button>
           <button
             class="button button-secondary"
             type="button"
-            aria-label="Siguiente palabra"
-            title="Siguiente (→)"
+            :aria-label="t('nextWord')"
+            :title="`${t('nextWord')} (→)`"
             @click="advance"
           >
             →
@@ -879,7 +972,7 @@ async function toggleFullscreen() {
           <button
             class="button button-secondary font-button"
             type="button"
-            aria-label="Reducir tamaño de letra"
+            :aria-label="t('decreaseFont')"
             @click="adjustFontSize(-4)"
           >
             A−
@@ -887,7 +980,7 @@ async function toggleFullscreen() {
           <button
             class="button button-secondary font-button"
             type="button"
-            aria-label="Aumentar tamaño de letra"
+            :aria-label="t('increaseFont')"
             @click="adjustFontSize(4)"
           >
             A+
@@ -895,8 +988,8 @@ async function toggleFullscreen() {
           <button
             class="button button-secondary"
             type="button"
-            :aria-label="isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'"
-            :title="isFullscreen ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'"
+            :aria-label="isFullscreen ? t('exitFullscreen') : t('fullscreen')"
+            :title="isFullscreen ? t('exitFullscreenShortcut') : t('fullscreenShortcut')"
             @click="toggleFullscreen"
           >
             {{ isFullscreen ? "⤢" : "⛶" }}
@@ -919,10 +1012,10 @@ async function toggleFullscreen() {
         @keydown="handleUnsavedDialogKeydown"
       >
         <h2 id="unsaved-dialog-title">
-          Cambios sin guardar
+          {{ t('unsavedTitle') }}
         </h2>
         <p id="unsaved-dialog-description">
-          ¿Quieres guardar los cambios de {{ displayFileName }} antes de continuar?
+          {{ t('unsavedDescription', { name: displayFileName }) }}
         </p>
         <div class="dialog-actions">
           <button
@@ -931,21 +1024,21 @@ async function toggleFullscreen() {
             type="button"
             @click="resolveUnsavedChoice('cancel')"
           >
-            Cancelar
+            {{ t('cancel') }}
           </button>
           <button
             class="button button-secondary"
             type="button"
             @click="resolveUnsavedChoice('discard')"
           >
-            No guardar
+            {{ t('discard') }}
           </button>
           <button
             class="button button-primary"
             type="button"
             @click="resolveUnsavedChoice('save')"
           >
-            Guardar
+            {{ t('save') }}
           </button>
         </div>
       </section>

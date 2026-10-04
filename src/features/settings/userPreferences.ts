@@ -17,6 +17,7 @@ export function loadUserPreferences(storage: PreferenceStorage = window.localSto
     const value: unknown = JSON.parse(serialized) as unknown;
     if (!isRecord(value)) throw new Error("Invalid preferences");
     const result: UserPreferences = {
+      interfaceLanguage: isLanguage(value.interfaceLanguage) ? value.interfaceLanguage : defaultUserPreferences.interfaceLanguage,
       theme: isTheme(value.theme) ? value.theme : defaultUserPreferences.theme,
       defaultFontSize: boundedNumber(value.defaultFontSize, 30, 96, defaultUserPreferences.defaultFontSize),
       defaultWordsPerMinute: boundedNumber(value.defaultWordsPerMinute, 80, 240, defaultUserPreferences.defaultWordsPerMinute),
