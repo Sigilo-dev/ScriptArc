@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, ref, watch, type ComputedRef } from "vue";
 import type { ReadingWord } from "../../shared/types";
-import { advancePlaybackDeadline } from "./playbackState";
+import { advancePlaybackDeadline, progressPercentToCursor } from "./playbackState";
 
 export function usePlayback(
   words: ComputedRef<ReadingWord[]>,
@@ -166,6 +166,10 @@ export function usePlayback(
     segmentDeadline = 0;
   }
 
+  function seekToProgress(progressPercent: number) {
+    seek(progressPercentToCursor(progressPercent, cumulativeDurations.value));
+  }
+
   function toggle() {
     if (isPlaying.value) pause();
     else play();
@@ -201,5 +205,6 @@ export function usePlayback(
     next,
     previous,
     seek,
+    seekToProgress,
   };
 }

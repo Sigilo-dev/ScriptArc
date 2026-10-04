@@ -1,7 +1,7 @@
 :root {
   font-family: "Aptos", "Segoe UI", sans-serif;
-  color: #182230;
-  background: #fff;
+  color: var(--text);
+  background: var(--surface);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -19,92 +19,58 @@
   --prompter-spoken-color: #d35062;
 }
 
-.theme-white {
-  --surface: #fff; --surface-muted: #f7f9fc; --text: #182230; --text-soft: #677487;
-  --line: #e8edf3; --accent: #2563eb; --accent-soft: #eaf1ff; --prompter-bg: #071a35;
-  --prompter-muted: #84a0c5; --prompter-text-color: #91d8ee; --prompter-current-color: #fff; --prompter-spoken-color: #d35062;
-}
-.theme-gray {
-  --surface: #eef0f3; --surface-muted: #e5e8ec; --text: #202a36; --text-soft: #657181;
-  --line: #d5dbe2; --accent: #34465d; --accent-soft: #dce3ec; --prompter-bg: #131a22;
-  --prompter-muted: #a0adbb; --prompter-text-color: #c5d0dc; --prompter-current-color: #fff; --prompter-spoken-color: #df7380;
-}
-.theme-orange {
-  --surface: #fff8f0; --surface-muted: #fff0e0; --text: #3a2415; --text-soft: #81634b;
-  --line: #f0d3b5; --accent: #e87924; --accent-soft: #ffead2; --prompter-bg: #251307;
-  --prompter-muted: #d0a67f; --prompter-text-color: #f5c18b; --prompter-current-color: #fff; --prompter-spoken-color: #f4717b;
-}
-.theme-blue {
-  --surface: #f5f8ff; --surface-muted: #edf3ff; --text: #102951; --text-soft: #5f7395;
-  --line: #d7e3f5; --accent: #2563eb; --accent-soft: #e2ecff; --prompter-bg: #061735;
-  --prompter-muted: #89a8d8; --prompter-text-color: #94c9ff; --prompter-current-color: #fff; --prompter-spoken-color: #e46e85;
-}
-.theme-pink {
-  --surface: #fff7fa; --surface-muted: #ffedf3; --text: #4b1d32; --text-soft: #896578;
-  --line: #f2d7e3; --accent: #db2777; --accent-soft: #ffe2ee; --prompter-bg: #2b1022;
-  --prompter-muted: #d49ab7; --prompter-text-color: #ffb1cd; --prompter-current-color: #fff; --prompter-spoken-color: #ff7c91;
-}
-.theme-black {
-  --surface: #000; --surface-muted: #080808; --text: #f5f5f5; --text-soft: #a1a1aa;
-  --line: #252525; --accent: #60a5fa; --accent-soft: #102a47; --prompter-bg: #000;
-  --prompter-muted: #858585; --prompter-text-color: #9bcaff; --prompter-current-color: #fff; --prompter-spoken-color: #ed7182;
-}
-
 * { box-sizing: border-box; }
 html, body, #app { width: 100%; min-width: 320px; min-height: 100%; margin: 0; }
 body { min-height: 100vh; }
 button, textarea { font: inherit; }
 button { color: inherit; }
-button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid #7ca6ff; outline-offset: 3px; }
+button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 
-.app-shell { min-height: 100vh; display: flex; flex-direction: column; background: var(--surface); color: var(--text); }
-.topbar, .prompter-toolbar { height: 76px; padding: 0 clamp(24px, 6vw, 88px); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
-.brand { display: inline-flex; align-items: center; gap: 11px; color: var(--text); text-decoration: none; font-family: Manrope, sans-serif; font-size: 18px; font-weight: 800; letter-spacing: -0.05em; }
-.brand-mark { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 9px; background: var(--accent); color: white; font-size: 19px; font-weight: 800; line-height: 1; }
-.project-status { max-width: min(36vw, 360px); overflow: hidden; color: var(--text-soft); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.interface-language-picker select { min-height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--text-soft); font: 700 11px/1 "Aptos", "Segoe UI", sans-serif; cursor: pointer; }
+.app-shell { position: relative; min-height: 100vh; display: flex; flex-direction: column; background: var(--surface); color: var(--text); }
+.prompter-toolbar { height: 76px; padding: 0 clamp(24px, 6vw, 88px); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
 .icon-button { width: 38px; height: 38px; display: inline-grid; place-items: center; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--text-soft); cursor: pointer; }
 .icon-button:hover { background: var(--surface-muted); color: var(--text); }
+.settings-floating-button { position: absolute; z-index: 11; top: 18px; right: clamp(24px, 6vw, 88px); }
 .editor-view { width: min(900px, calc(100% - 48px)); margin: clamp(50px, 9vh, 94px) auto 70px; flex: 1; }
 .editor-heading { margin-bottom: 37px; }
 .document-title { margin: 13px 0 0; color: var(--text-soft); font-size: 14px; }
 .eyebrow { margin: 0 0 14px; color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
 h1 { margin: 0; font-family: "Aptos Display", "Segoe UI", sans-serif; font-size: clamp(36px, 5.2vw, 62px); line-height: 1.09; letter-spacing: -.055em; font-weight: 700; }
-h1 span { color: #9aa7b8; }
+h1 span { color: var(--text-soft); }
 .script-input { display: block; width: 100%; min-height: min(36vh, 330px); resize: vertical; padding: 25px 27px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface-muted); color: var(--text); font-size: 16px; line-height: 1.75; transition: border-color .18s, box-shadow .18s; }
 .markdown-editor { overflow: hidden; border: 1px solid var(--line); border-radius: 15px; background: var(--surface-muted); transition: border-color .18s, box-shadow .18s; }
-.markdown-editor:focus-within { border-color: #abc4ff; box-shadow: 0 0 0 4px #eaf1ff; }
+.markdown-editor:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
 .markdown-toolbar { min-height: 45px; display: flex; align-items: center; gap: 5px; padding: 0 15px; border-bottom: 1px solid var(--line); background: var(--surface); }
-.format-button { width: 29px; height: 29px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: #657389; font-size: 13px; font-weight: 700; cursor: pointer; }
+.format-button { width: 29px; height: 29px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: var(--text-soft); font-size: 13px; font-weight: 700; cursor: pointer; }
 .format-button:hover { background: var(--accent-soft); color: var(--accent); }
 .format-italic { font-style: italic; }
 .format-strike { text-decoration: line-through; }
 .toolbar-divider { width: 1px; height: 19px; margin: 0 5px; background: var(--line); }
-.toolbar-note { margin-left: auto; color: #99a5b4; font-size: 11px; }
+.toolbar-note { margin-left: auto; color: var(--text-soft); font-size: 11px; }
 .markdown-editor .script-input { min-height: min(36vh, 285px); border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .markdown-editor .script-input:focus { border: 0; outline: none; }
-.script-input::placeholder { color: #9aa6b5; }
-.script-input:focus { border-color: #abc4ff; box-shadow: 0 0 0 4px #eaf1ff; outline: none; }
+.script-input::placeholder { color: var(--text-soft); }
+.script-input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); outline: none; }
 .editor-actions { margin-top: 20px; display: flex; justify-content: space-between; align-items: center; gap: 20px; }
 .primary-actions, .file-actions { display: flex; align-items: center; gap: 10px; }
 .button { min-height: 43px; padding: 0 18px; border: 1px solid transparent; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; transition: transform .15s, background .15s, opacity .15s; }
 .button:not(:disabled):active { transform: translateY(1px); }
 .button:disabled, .text-button:disabled { opacity: .45; cursor: not-allowed; }
 .button-primary { display: inline-flex; gap: 17px; align-items: center; background: var(--accent); color: white; }
-.button-primary:not(:disabled):hover { background: #1d4ed8; }
+.button-primary:not(:disabled):hover { background: color-mix(in srgb, var(--accent), #000 12%); }
 .button-secondary { border-color: var(--line); background: var(--surface); color: var(--text); }
 .button-secondary:not(:disabled):hover { background: var(--surface-muted); }
 .text-button { border: 0; padding: 8px; background: transparent; color: var(--text-soft); font-size: 12px; font-weight: 600; cursor: pointer; }
 .text-button:not(:disabled):hover { color: var(--accent); }
 .editor-hint { margin: 18px 0 0; color: var(--text-soft); font-size: 12px; }
 .notice { min-height: 18px; margin: 10px 0 0; color: var(--accent); font-size: 12px; }
-.app-footer { min-height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(24px, 6vw, 88px); border-top: 1px solid var(--line); color: #9aa6b5; font-size: 11px; }
+.app-footer { min-height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(24px, 6vw, 88px); border-top: 1px solid var(--line); color: var(--text-soft); font-size: 11px; }
 
 .screen-teleprompter { min-height: 100vh; background: var(--prompter-bg); color: white; }
-.prompter-toolbar { border-color: rgba(255,255,255,.1); }
-.prompter-toolbar .text-button { color: #b6c7df; font-size: 13px; }
+.prompter-toolbar { border-color: color-mix(in srgb, var(--prompter-current-color), transparent 90%); }
+.prompter-toolbar .text-button { color: var(--prompter-muted); font-size: 13px; }
 .mode-label { color: var(--prompter-muted); font-size: 12px; }
-.screen-teleprompter .icon-button { border-color: rgba(255,255,255,.15); background: transparent; color: #c0d1e9; }
+.screen-teleprompter .icon-button { border-color: color-mix(in srgb, var(--prompter-current-color), transparent 82%); background: transparent; color: var(--prompter-muted); }
 .prompter-view { width: min(1120px, calc(100% - 60px)); max-height: calc(100vh - 156px); min-height: 0; flex: 1 1 auto; margin: 0 auto; overflow-y: auto; padding: calc(50vh - 110px) 0; scrollbar-width: none; scroll-behavior: smooth; }
 .prompter-view::-webkit-scrollbar { display: none; }
 .prompter-text { display: flex; flex-wrap: wrap; column-gap: .25em; color: var(--prompter-text-color); font-family: "Aptos Display", "Segoe UI", sans-serif; font-size: clamp(30px, var(--prompter-font-size, 5.5vw), 96px); font-weight: 700; line-height: 1.32; letter-spacing: -.045em; }
@@ -114,18 +80,18 @@ h1 span { color: #9aa7b8; }
 .prompter-text .word-strong { font-weight: 800; }
 .prompter-text .word-emphasis { font-style: italic; }
 .prompter-text .word-strikethrough { text-decoration: line-through; }
-.empty-prompter { color: #9ab0ce; }
-.notice-dark { width: 100%; margin: -20px 0 8px; color: #a7c3f6; text-align: center; }
-.manual-instruction { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 5px; margin: 0 24px 12px; color: #9ab0ce; font-size: 12px; text-align: center; }
-.manual-instruction kbd, .countdown-key-hint kbd { display: inline-flex; min-width: 27px; height: 23px; justify-content: center; align-items: center; margin: 0 2px; padding: 0 5px; border: 1px solid rgba(211, 225, 248, .34); border-bottom-width: 2px; border-radius: 5px; background: rgba(211, 225, 248, .08); color: #fff; font: 600 13px/1 "Segoe UI Symbol", "Segoe UI", sans-serif; }
+.empty-prompter { color: var(--prompter-muted); }
+.notice-dark { width: 100%; margin: -20px 0 8px; color: var(--prompter-current-color); text-align: center; }
+.manual-instruction { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 5px; margin: 0 24px 12px; color: var(--prompter-muted); font-size: 12px; text-align: center; }
+.manual-instruction kbd, .countdown-key-hint kbd { display: inline-flex; min-width: 27px; height: 23px; justify-content: center; align-items: center; margin: 0 2px; padding: 0 5px; border: 1px solid color-mix(in srgb, var(--prompter-current-color), transparent 70%); border-bottom-width: 2px; border-radius: 5px; background: color-mix(in srgb, var(--prompter-current-color), transparent 92%); color: var(--prompter-current-color); font: 600 13px/1 "Segoe UI Symbol", "Segoe UI", sans-serif; }
 .manual-instruction .keycap-space, .countdown-key-hint .keycap-space { width: 43px; padding: 0; }
 .keycap-space > span { display: block; width: 24px; height: 2px; margin-top: 7px; background: currentColor; }
 .keystroke-separator { margin: 0 2px; color: var(--prompter-muted); }
-.recording-button { border-color: rgba(255,115,132,.55) !important; color: #ffb3bf !important; }
-.prompter-controls { position: sticky; bottom: 0; min-height: 80px; display: flex; justify-content: center; align-items: center; gap: 24px; border-top: 1px solid rgba(255,255,255,.1); background: rgba(7,26,53,.92); backdrop-filter: blur(12px); }
-.prompter-controls .button-secondary { border-color: rgba(255,255,255,.18); background: transparent; color: white; }
+.recording-button { border-color: color-mix(in srgb, var(--prompter-spoken-color), transparent 45%) !important; color: var(--prompter-spoken-color) !important; }
+.prompter-controls { position: sticky; bottom: 0; min-height: 80px; display: flex; justify-content: center; align-items: center; gap: 24px; border-top: 1px solid color-mix(in srgb, var(--prompter-current-color), transparent 88%); background: color-mix(in srgb, var(--prompter-bg), transparent 8%); backdrop-filter: blur(12px); }
+.prompter-controls .button-secondary { border-color: color-mix(in srgb, var(--prompter-current-color), transparent 82%); background: transparent; color: var(--prompter-current-color); }
 .playback-button { min-width: 104px; }
-.progress-label { min-width: 72px; color: #9ab0ce; font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; }
+.progress-label { min-width: 72px; color: var(--prompter-muted); font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .settings-panel { position: absolute; z-index: 10; top: 64px; right: clamp(18px, 6vw, 88px); width: min(360px, calc(100vw - 36px)); max-height: calc(100vh - 82px); overflow-y: auto; overscroll-behavior: contain; padding: 21px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); color: var(--text); box-shadow: 0 18px 48px rgba(13, 31, 57, .16); }
@@ -145,6 +111,10 @@ h1 span { color: #9aa7b8; }
 .settings-range > span { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .settings-range output { color: var(--text); font-variant-numeric: tabular-nums; }
 .settings-range input { width: 100%; margin: 3px 0; accent-color: var(--accent); }
+.custom-palette-editor { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 17px; padding-top: 14px; border-top: 1px solid var(--line); }
+.custom-palette-editor h3 { grid-column: 1 / -1; margin: 0 0 2px; color: var(--text); font-size: 12px; }
+.custom-color-field { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 5px; padding: 6px; border: 1px solid var(--line); border-radius: 8px; color: var(--text-soft); font-size: 10px; line-height: 1.25; }
+.custom-color-field input { flex: 0 0 32px; width: 32px; height: 26px; padding: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); cursor: pointer; }
 .settings-toggle { display: flex; align-items: center; gap: 9px; margin-top: 16px; color: var(--text-soft); font-size: 12px; line-height: 1.4; cursor: pointer; }
 .settings-toggle input { width: 16px; height: 16px; accent-color: var(--accent); }
 .dialog-backdrop { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, .44); }
@@ -154,7 +124,7 @@ h1 span { color: #9aa7b8; }
 .unsaved-dialog p { margin: 0; color: var(--text-soft); font-size: 14px; line-height: 1.55; }
 .dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 24px; }
 .dialog-actions .button { min-height: 38px; padding: 0 12px; }
-.countdown-overlay { position: fixed; z-index: 25; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: color-mix(in srgb, var(--prompter-bg), transparent 8%); color: white; backdrop-filter: blur(8px); }
+.countdown-overlay { position: fixed; z-index: 25; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: color-mix(in srgb, var(--prompter-bg), transparent 8%); color: var(--prompter-current-color); backdrop-filter: blur(8px); }
 .countdown-overlay span { color: var(--prompter-muted); font-size: clamp(15px, 2vw, 24px); }
 .countdown-overlay strong { color: var(--prompter-current-color); font-size: clamp(96px, 24vw, 240px); line-height: 1; font-variant-numeric: tabular-nums; }
 .countdown-key-hint { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; margin: -4px 0 6px; color: var(--prompter-muted); font-size: 13px; }
@@ -162,8 +132,8 @@ h1 span { color: #9aa7b8; }
 .countdown-overlay .keycap-space > span { width: 24px; height: 2px; margin-top: 7px; font-size: 0; }
 
 @media (max-width: 640px) {
-  .topbar, .prompter-toolbar { height: 64px; padding: 0 20px; }
-  .interface-language-picker select { min-height: 32px; }
+  .prompter-toolbar { height: 64px; padding: 0 20px; }
+  .settings-floating-button { top: 15px; right: 20px; }
   .editor-view { width: calc(100% - 36px); margin-top: 52px; }
   .script-input { min-height: 35vh; padding: 18px; }
   .editor-actions { align-items: flex-start; flex-direction: column; }
@@ -196,21 +166,21 @@ h1 span { color: #9aa7b8; }
 .prompter-text .word-strong { font-weight: 850; }
 .prompter-text .word-emphasis { font-style: italic; }
 .prompter-text .word-strikethrough { text-decoration: line-through; }
-.prompter-controls { position: fixed; z-index: 30; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; align-items: center; gap: 9px; min-height: 100px; padding: 10px 22px 17px; border-top: 1px solid rgba(255,255,255,.1); background: color-mix(in srgb, var(--prompter-bg), transparent 7%); backdrop-filter: blur(13px); transition: opacity .22s ease, transform .22s ease; }
+.prompter-controls { position: fixed; z-index: 30; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; align-items: center; gap: 9px; min-height: 100px; padding: 10px 22px 17px; border-top: 1px solid color-mix(in srgb, var(--prompter-current-color), transparent 88%); background: color-mix(in srgb, var(--prompter-bg), transparent 7%); backdrop-filter: blur(13px); transition: opacity .22s ease, transform .22s ease; }
 .prompter-controls.controls-hidden { opacity: 0; transform: translateY(110%); pointer-events: none; }
 .playback-progress { display: grid; grid-template-columns: auto minmax(180px, min(650px, 72vw)) auto; align-items: center; gap: 13px; width: min(820px, 100%); color: var(--prompter-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
-.progress-slider { width: 100%; height: 5px; margin: 9px 0; border-radius: 5px; background: linear-gradient(to right, #7aa7ff var(--progress, 0%), rgba(180,198,222,.32) var(--progress, 0%)); appearance: none; cursor: pointer; }
-.progress-slider::-webkit-slider-thumb { width: 14px; height: 14px; border: 2px solid white; border-radius: 50%; background: #6f9fff; box-shadow: 0 0 0 4px rgba(106,153,245,.18); appearance: none; }
-.progress-slider::-moz-range-thumb { width: 11px; height: 11px; border: 2px solid white; border-radius: 50%; background: #6f9fff; box-shadow: 0 0 0 4px rgba(106,153,245,.18); }
+.progress-slider { width: 100%; height: 5px; margin: 9px 0; border-radius: 5px; background: linear-gradient(to right, var(--prompter-current-color) var(--progress, 0%), color-mix(in srgb, var(--prompter-muted), transparent 68%) var(--progress, 0%)); appearance: none; cursor: pointer; }
+.progress-slider::-webkit-slider-thumb { width: 14px; height: 14px; border: 2px solid var(--prompter-bg); border-radius: 50%; background: var(--prompter-current-color); box-shadow: 0 0 0 4px color-mix(in srgb, var(--prompter-current-color), transparent 84%); appearance: none; }
+.progress-slider::-moz-range-thumb { width: 11px; height: 11px; border: 2px solid var(--prompter-bg); border-radius: 50%; background: var(--prompter-current-color); box-shadow: 0 0 0 4px color-mix(in srgb, var(--prompter-current-color), transparent 84%); }
 .progress-slider:disabled { opacity: .4; cursor: not-allowed; }
 .control-buttons { display: flex; align-items: center; justify-content: center; gap: 12px; }
 .control-buttons .button { min-width: 43px; }
 .control-buttons .playback-button { min-width: 108px; }
-.control-buttons .button-secondary { border-color: rgba(255,255,255,.18); background: rgba(255,255,255,.045); color: white; }
-.control-buttons .button-secondary:not(:disabled):hover { background: rgba(255,255,255,.12); }
+.control-buttons .button-secondary { border-color: color-mix(in srgb, var(--prompter-current-color), transparent 82%); background: color-mix(in srgb, var(--prompter-current-color), transparent 96%); color: var(--prompter-current-color); }
+.control-buttons .button-secondary:not(:disabled):hover { background: color-mix(in srgb, var(--prompter-current-color), transparent 88%); }
 .control-buttons .font-button { min-width: 39px; padding: 0 8px; }
 .manual-instruction { margin: 0; color: var(--prompter-muted); font-size: 11px; text-align: center; }
-.notice-dark { position: fixed; z-index: 35; right: 16px; bottom: 114px; left: 16px; width: auto; margin: 0; color: #c8dbff; text-align: center; pointer-events: none; }
+.notice-dark { position: fixed; z-index: 35; right: 16px; bottom: 114px; left: 16px; width: auto; margin: 0; color: var(--prompter-text-color); text-align: center; pointer-events: none; }
 .empty-prompter { margin-top: 0; color: var(--prompter-muted); font-size: var(--prompter-font-size, 56px); }
 .screen-teleprompter:fullscreen { width: 100%; height: 100%; background: var(--prompter-bg); }
 
@@ -224,7 +194,6 @@ h1 span { color: #9aa7b8; }
   .prompter-controls { min-height: 95px; padding: 8px 10px 12px; }
   .manual-instruction { max-width: 90vw; font-size: 10px; }
   .language-choice { align-items: stretch; flex-direction: column; }
-  .project-status { max-width: 30vw; }
   .dialog-actions { justify-content: stretch; }
   .dialog-actions .button { flex: 1; }
 }

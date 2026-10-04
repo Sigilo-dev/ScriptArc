@@ -1,6 +1,21 @@
 export type Language = "es" | "en";
 export type TimingMode = "automatic" | "manual";
-export type ThemeId = "white" | "gray" | "orange" | "blue" | "pink" | "black";
+export type ThemeId = "white" | "gray" | "orange" | "blue" | "pink" | "black" | "custom";
+
+export interface ThemePalette {
+  surface: string;
+  surfaceMuted: string;
+  text: string;
+  textSoft: string;
+  line: string;
+  accent: string;
+  accentSoft: string;
+  prompterBg: string;
+  prompterMuted: string;
+  prompterTextColor: string;
+  prompterCurrentColor: string;
+  prompterSpokenColor: string;
+}
 
 export interface AutomaticTimingSettings {
   language: Language;
@@ -24,6 +39,8 @@ export interface TeleprompterPreferences {
 export interface UserPreferences {
   interfaceLanguage: Language;
   theme: ThemeId;
+  customPalette: ThemePalette;
+  customPaletteInitialized: boolean;
   defaultFontSize: number;
   defaultWordsPerMinute: number;
   defaultLanguage: Language;

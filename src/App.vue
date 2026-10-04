@@ -29,7 +29,8 @@ import TeleprompterText from "./features/teleprompter/TeleprompterText.vue";
 import { formatPlaybackTime } from "./features/teleprompter/playbackState";
 import { translate, translateErrorMessage, type UiTextKey } from "./shared/localization";
 import { usePlayback } from "./features/teleprompter/usePlayback";
-import type { Language, ReadingWord, TimingMode, UserPreferences } from "./shared/types";
+import type { Language, ReadingWord, ThemePalette, TimingMode, UserPreferences } from "./shared/types";
+import { THEME_PALETTES } from "./features/settings/themes";
 
 type Screen = "editor" | "teleprompter";
 type UnsavedChoice = "save" | "discard" | "cancel";
@@ -42,6 +43,26 @@ const filePath = ref<string | null>(null);
 const savedFingerprint = ref(projectFingerprint(project.value));
 const hasUnsavedChanges = ref(false);
 const displayFileName = computed(() => filePath.value?.split(/[\\/]/u).pop() ?? t("unsavedProject"));
+const appStyle = computed(() => {
+  const palette = userPreferences.value.theme === "custom"
+    ? userPreferences.value.customPalette
+    : THEME_PALETTES[userPreferences.value.theme];
+  return {
+    "--prompter-font-size": `${project.value.teleprompterSettings.fontSize}px`,
+    "--surface": palette.surface,
+    "--surface-muted": palette.surfaceMuted,
+    "--text": palette.text,
+    "--text-soft": palette.textSoft,
+    "--line": palette.line,
+    "--accent": palette.accent,
+    "--accent-soft": palette.accentSoft,
+    "--prompter-bg": palette.prompterBg,
+    "--prompter-muted": palette.prompterMuted,
+    "--prompter-text-color": palette.prompterTextColor,
+    "--prompter-current-color": palette.prompterCurrentColor,
+    "--prompter-spoken-color": palette.prompterSpokenColor,
+  };
+});
 const sourceMarkdown = computed({
   get: () => project.value.sourceMarkdown,
   set: (markdown: string) => {
@@ -549,7 +570,7 @@ function stopPlayback() {
 }
 
 function seekFromProgress(event: Event) {
-  playback.seek(Number((event.target as HTMLInputElement).value));
+  playback.seekToProgress(Number((event.target as HTMLInputElement).value));
 }
 
 function adjustFontSize(amount: number) {
@@ -557,7 +578,17 @@ function adjustFontSize(amount: number) {
   hasUnsavedChanges.value = true;
 }
 
-function updateTheme(value: UserPreferences["theme"]) { userPreferences.value.theme = value; }
+function updateTheme(value: UserPreferences["theme"]) {
+  if (value === "custom" && !userPreferences.value.customPaletteInitialized) {
+    const currentTheme = userPreferences.value.theme;
+    userPreferences.value.customPalette = { ...THEME_PALETTES[currentTheme === "custom" ? "white" : currentTheme] };
+    userPreferences.value.customPaletteInitialized = true;
+  }
+  userPreferences.value.theme = value;
+}
+function updateCustomPalette(value: ThemePalette) {
+  userPreferences.value.customPalette = value;
+}
 function updateInterfaceLanguage(value: Language) { userPreferences.value.interfaceLanguage = value; }
 function updateLanguage(value: Language) { userPreferences.value.defaultLanguage = value; }
 function selectProjectLanguage(value: Language) {
@@ -585,8 +616,8 @@ async function toggleFullscreen() {
   <main
     ref="appRoot"
     class="app-shell"
-    :class="[`screen-${screen}`, `theme-${userPreferences.theme}`, { 'controls-visible': controlsVisible }]"
-    :style="{ '--prompter-font-size': `${project.teleprompterSettings.fontSize}px` }"
+    :class="[`screen-${screen}`, { 'controls-visible': controlsVisible }]"
+    :style="appStyle"
   >
     <div
       v-if="!appReady"
@@ -597,49 +628,21 @@ async function toggleFullscreen() {
       {{ t('startup') }}
     </div>
     <template v-if="screen === 'editor'">
-      <header class="topbar">
-        <a
-          class="brand"
-          href="#"
-          :aria-label="t('home')"
-          @click.prevent="returnToEditor"
-        >
-          <span
-            class="brand-mark"
-            aria-hidden="true"
-          >s</span>
-          <span>ScriptArc</span>
-        </a>
-        <span
-          class="project-status"
-          :title="filePath ?? t('unsavedProject')"
-        >{{ displayFileName }}{{ hasUnsavedChanges ? " •" : "" }}</span>
-        <label class="interface-language-picker">
-          <span class="sr-only">{{ t('interfaceLanguage') }}</span>
-          <select
-            :value="userPreferences.interfaceLanguage"
-            :aria-label="t('interfaceLanguage')"
-            @change="updateInterfaceLanguage(($event.target as HTMLSelectElement).value as Language)"
-          >
-            <option value="es">ES</option>
-            <option value="en">EN</option>
-          </select>
-        </label>
-        <button
-          class="icon-button"
-          type="button"
-          :aria-label="t('settings')"
-          :title="t('settings')"
-          :aria-expanded="settingsOpen"
-          @click="settingsOpen = !settingsOpen"
-        >
-          <span aria-hidden="true">⚙</span>
-        </button>
-      </header>
+      <button
+        class="icon-button settings-floating-button"
+        type="button"
+        :aria-label="t('settings')"
+        :title="t('settings')"
+        :aria-expanded="settingsOpen"
+        @click="settingsOpen = !settingsOpen"
+      >
+        <span aria-hidden="true">⚙</span>
+      </button>
       <SettingsPanel
         v-if="settingsOpen"
         :interface-language="userPreferences.interfaceLanguage"
         :theme="userPreferences.theme"
+        :custom-palette="userPreferences.customPalette"
         :language="userPreferences.defaultLanguage"
         :words-per-minute="userPreferences.defaultWordsPerMinute"
         :font-size="userPreferences.defaultFontSize"
@@ -647,6 +650,7 @@ async function toggleFullscreen() {
         :hide-controls-automatically="userPreferences.hideControlsAutomatically"
         @update:interface-language="updateInterfaceLanguage"
         @update:theme="updateTheme"
+        @update:custom-palette="updateCustomPalette"
         @update:language="updateLanguage"
         @update:words-per-minute="updateWordsPerMinute"
         @update:font-size="updateFontSize"
@@ -806,6 +810,7 @@ async function toggleFullscreen() {
         v-if="settingsOpen"
         :interface-language="userPreferences.interfaceLanguage"
         :theme="userPreferences.theme"
+        :custom-palette="userPreferences.customPalette"
         :language="userPreferences.defaultLanguage"
         :words-per-minute="userPreferences.defaultWordsPerMinute"
         :font-size="userPreferences.defaultFontSize"
@@ -813,6 +818,7 @@ async function toggleFullscreen() {
         :hide-controls-automatically="userPreferences.hideControlsAutomatically"
         @update:interface-language="updateInterfaceLanguage"
         @update:theme="updateTheme"
+        @update:custom-palette="updateCustomPalette"
         @update:language="updateLanguage"
         @update:words-per-minute="updateWordsPerMinute"
         @update:font-size="updateFontSize"
@@ -875,8 +881,9 @@ async function toggleFullscreen() {
             class="progress-slider"
             type="range"
             min="0"
-            :max="words.length"
-            :value="cursor"
+            max="100"
+            step="0.1"
+            :value="progressPercent"
             :style="{ '--progress': `${progressPercent}%` }"
             :disabled="isRecording || (timingMode === 'manual' && manualSession.status === 'ready')"
             :aria-label="t('readingProgress')"
@@ -885,7 +892,7 @@ async function toggleFullscreen() {
           <span>-{{ formatPlaybackTime(remainingMilliseconds) }}</span>
         </div>
         <p
-          v-if="timingMode === 'manual'"
+          v-if="timingMode === 'manual' && manualSession.status !== 'review'"
           class="manual-instruction"
         >
           <template v-if="isRecording">
@@ -904,9 +911,6 @@ async function toggleFullscreen() {
               role="img"
               :aria-label="t('keyArrowLeft')"
             >←</kbd>
-          </template>
-          <template v-else-if="manualSession.status === 'review'">
-            {{ t('recordingReady') }}
           </template>
           <template v-else>
             {{ t('startRecordingHint') }}

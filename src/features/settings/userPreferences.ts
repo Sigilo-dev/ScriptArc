@@ -1,4 +1,4 @@
-import type { Language, ThemeId, UserPreferences } from "../../shared/types";
+import type { Language, ThemeId, ThemePalette, UserPreferences } from "../../shared/types";
 import { defaultUserPreferences } from "../project/projectModel";
 
 export const USER_PREFERENCES_KEY = "scriptarc.user-preferences.v1";
@@ -19,6 +19,10 @@ export function loadUserPreferences(storage: PreferenceStorage = window.localSto
     const result: UserPreferences = {
       interfaceLanguage: isLanguage(value.interfaceLanguage) ? value.interfaceLanguage : defaultUserPreferences.interfaceLanguage,
       theme: isTheme(value.theme) ? value.theme : defaultUserPreferences.theme,
+      customPalette: readThemePalette(value.customPalette, defaultUserPreferences.customPalette),
+      customPaletteInitialized: typeof value.customPaletteInitialized === "boolean"
+        ? value.customPaletteInitialized
+        : defaultUserPreferences.customPaletteInitialized,
       defaultFontSize: boundedNumber(value.defaultFontSize, 30, 96, defaultUserPreferences.defaultFontSize),
       defaultWordsPerMinute: boundedNumber(value.defaultWordsPerMinute, 80, 240, defaultUserPreferences.defaultWordsPerMinute),
       defaultLanguage: isLanguage(value.defaultLanguage) ? value.defaultLanguage : defaultUserPreferences.defaultLanguage,
@@ -55,5 +59,21 @@ function isLanguage(value: unknown): value is Language {
 }
 
 function isTheme(value: unknown): value is ThemeId {
-  return value === "white" || value === "gray" || value === "orange" || value === "blue" || value === "pink" || value === "black";
+  return value === "white" || value === "gray" || value === "orange" || value === "blue" || value === "pink" || value === "black" || value === "custom";
+}
+
+const THEME_PALETTE_KEYS: readonly (keyof ThemePalette)[] = [
+  "surface", "surfaceMuted", "text", "textSoft", "line", "accent", "accentSoft",
+  "prompterBg", "prompterMuted", "prompterTextColor", "prompterCurrentColor", "prompterSpokenColor",
+];
+
+function readThemePalette(value: unknown, fallback: ThemePalette): ThemePalette {
+  if (!isRecord(value)) return { ...fallback };
+  const result = {} as ThemePalette;
+  for (const key of THEME_PALETTE_KEYS) {
+    const color = value[key];
+    if (typeof color !== "string" || !/^#[\da-f]{6}$/iu.test(color)) return { ...fallback };
+    result[key] = color;
+  }
+  return result;
 }

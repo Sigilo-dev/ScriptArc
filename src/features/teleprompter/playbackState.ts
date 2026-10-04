@@ -16,6 +16,26 @@ export interface PlaybackDeadlineResult {
   finished: boolean;
 }
 
+/** Returns the closest word boundary for a percentage on the full reading timeline. */
+export function progressPercentToCursor(progressPercent: number, cumulativeDurations: readonly number[]): number {
+  const finalBoundary = cumulativeDurations.length - 1;
+  if (finalBoundary <= 0) return 0;
+  const totalDuration = cumulativeDurations[finalBoundary] ?? 0;
+  if (totalDuration <= 0) return 0;
+  const targetTime = totalDuration * Math.max(0, Math.min(100, progressPercent)) / 100;
+  let low = 0;
+  let high = finalBoundary;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if ((cumulativeDurations[middle] ?? 0) < targetTime) low = middle + 1;
+    else high = middle;
+  }
+  if (low === 0) return 0;
+  const previousBoundary = cumulativeDurations[low - 1] ?? 0;
+  const nextBoundary = cumulativeDurations[low] ?? totalDuration;
+  return targetTime - previousBoundary <= nextBoundary - targetTime ? low - 1 : low;
+}
+
 /** Advances over delayed timer callbacks while preserving the original timeline. */
 export function advancePlaybackDeadline(
   cursor: number,

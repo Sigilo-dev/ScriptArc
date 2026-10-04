@@ -22,6 +22,8 @@ Este archivo recoge decisiones y correcciones que deben mantenerse durante el de
 - Mantener organización pequeña por feature; evitar capas ceremoniales y dependencias que no resuelvan una necesidad del producto.
 - La interfaz se localiza con un diccionario ES/EN y conserva la preferencia en el almacenamiento del usuario; el selector ES/EN queda visible desde el editor inicial, separado del idioma del guion y de su conversión numérica.
 - Las instrucciones de RECORD usan glifos de teclas (→, ← y una barra espaciadora dibujada), con nombres traducidos solo como etiquetas accesibles. Durante la cuenta regresiva manual, Space o → omiten la espera y ejecutan RECORD; Escape la cancela.
+- El tema personalizado es una preferencia global: al entrar por primera vez se copia la paleta predefinida elegida y sus doce colores se validan como valores hexadecimales antes de guardarse. Así las variables CSS nunca reciben texto arbitrario y el tema se mantiene después de reiniciar.
+- La barra de progreso refleja tiempo acumulado (duraciones variables por palabra); al arrastrarla se busca el límite de palabra más cercano con búsqueda binaria, de modo que el punto coincide con el relleno y el salto sigue siendo por palabra.
 
 ## Problemas encontrados y solución
 
