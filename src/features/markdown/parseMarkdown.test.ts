@@ -16,6 +16,25 @@ describe("parseMarkdown", () => {
     expect(document.tokens[1].punctuation).toBe("semicolon");
   });
 
+  it("treats sentence punctuation as part of the spoken word", () => {
+    expect(parseMarkdown("Hola.").tokens.map(({ displayText }) => displayText)).toEqual(["Hola."]);
+    expect(parseMarkdown("Hola, mundo.").tokens.map(({ displayText }) => displayText)).toEqual(["Hola,", "mundo."]);
+    expect(parseMarkdown("¿Cómo estás?").tokens.map(({ displayText }) => displayText)).toEqual(["¿Cómo", "estás?"]);
+    expect(parseMarkdown("Hola , mundo .").tokens.map(({ displayText }) => displayText)).toEqual(["Hola,", "mundo."]);
+  });
+
+  it("preserves rich Markdown styles, nesting, and heading levels on word tokens", () => {
+    const document = parseMarkdown("### Título\nEsto es **muy importante**. También *cambia* y ~~mantén~~.");
+    expect(document.blocks[0]).toMatchObject({ kind: "heading", level: 3 });
+    expect(document.tokens.map(({ displayText }) => displayText)).toEqual([
+      "Título", "Esto", "es", "muy", "importante.", "También", "cambia", "y", "mantén.",
+    ]);
+    expect(document.tokens[3].emphasisStyles).toContain("strong");
+    expect(document.tokens[6].emphasisStyles).toEqual(["emphasis"]);
+    expect(document.tokens[8].emphasisStyles).toEqual(["strikethrough"]);
+    expect(document.spokenText).not.toMatch(/[#*_~]/u);
+  });
+
   it("recognizes lists and links while omitting formatting labels", () => {
     const document = parseMarkdown("- Lee [este guion](https://example.com).\n1. Sigue el paso");
     expect(document.blocks.map(({ kind }) => kind)).toEqual(["list-item", "list-item"]);

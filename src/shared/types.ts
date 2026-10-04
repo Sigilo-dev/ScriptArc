@@ -37,12 +37,14 @@ export interface ScriptProject {
 
 export interface MarkdownToken {
   index: number;
+  displayText: string;
   visibleText: string;
   spokenText: string;
   sourceStart: number;
   sourceEnd: number;
   emphasis: "strong" | "emphasis" | "strikethrough" | null;
-  punctuation: "comma" | "semicolon" | "sentence" | null;
+  emphasisStyles: Array<"strong" | "emphasis" | "strikethrough">;
+  punctuation: "comma" | "semicolon" | "colon" | "sentence" | null;
 }
 
 export interface MarkdownBlock {

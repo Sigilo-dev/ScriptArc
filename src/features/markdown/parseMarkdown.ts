@@ -1,69 +1,119 @@
 import type { MarkdownBlock, MarkdownToken, ParsedMarkdownDocument } from "../../shared/types";
 
-interface VisibleRun {
+type EmphasisStyle = NonNullable<MarkdownToken["emphasis"]>;
+
+interface InlineRun {
   text: string;
-  emphasis: MarkdownToken["emphasis"];
+  emphasisStyles: EmphasisStyle[];
   sourceStart: number;
 }
 
+interface PreparedBlock {
+  kind: MarkdownBlock["kind"];
+  level?: number;
+  content: string;
+  contentOffset: number;
+}
+
+interface TokenCandidate {
+  text: string;
+  start: number;
+  end: number;
+}
+
+/** Parses presentation Markdown while keeping sourceMarkdown as the canonical source. */
 export function parseMarkdown(sourceMarkdown: string): ParsedMarkdownDocument {
   const blocks: MarkdownBlock[] = [];
   const tokens: MarkdownToken[] = [];
-  let absoluteOffset = 0;
+  let lineOffset = 0;
 
-  for (const sourceLine of sourceMarkdown.split(/\r?\n/u)) {
-    const lineOffset = absoluteOffset;
-    absoluteOffset += sourceLine.length + 1;
+  const sourceLines = sourceMarkdown.split(/\r?\n/u);
+  const newlineLengths = [...sourceMarkdown.matchAll(/\r?\n/gu)].map((match) => match[0].length);
+  for (const [lineIndex, sourceLine] of sourceLines.entries()) {
     const line = sourceLine.trimEnd();
-    if (!line.trim()) continue;
+    if (line.trim()) {
+      const prepared = prepareBlock(line);
+      if (prepared.content.trim()) {
+        const tokenStart = tokens.length;
+        const runs = parseInline(prepared.content, lineOffset + prepared.contentOffset);
+        const visibleLine = runs.map((run) => run.text).join("");
+        const candidates = wordCandidates(visibleLine);
+        const runRanges = getRunRanges(runs);
+        let pendingPrefix = "";
+        let pendingPrefixStart: number | null = null;
 
-    const prepared = prepareBlock(line);
-    if (!prepared.content.trim()) continue;
-    const tokenStart = tokens.length;
-    const runs = tokenizeInline(prepared.content, lineOffset + prepared.contentOffset);
-    const visibleLine = runs.map((run) => run.text).join("");
-    const runRanges = runs.reduce<Array<VisibleRun & { visibleStart: number; visibleEnd: number }>>((ranges, run) => {
-      const visibleStart = ranges.length ? ranges[ranges.length - 1].visibleEnd : 0;
-      ranges.push({ ...run, visibleStart, visibleEnd: visibleStart + run.text.length });
-      return ranges;
-    }, []);
-    for (const match of visibleLine.matchAll(/\S+/gu)) {
-      const word = match[0];
-      const wordStart = match.index ?? 0;
-      const wordEnd = wordStart + word.length;
-      const overlappingRuns = runRanges.filter((run) => run.visibleStart < wordEnd && run.visibleEnd > wordStart);
-      const firstRun = overlappingRuns[0];
-      const lastRun = overlappingRuns[overlappingRuns.length - 1];
-      tokens.push({
-        index: tokens.length,
-        visibleText: word,
-        spokenText: word,
-        sourceStart: firstRun.sourceStart + Math.max(0, wordStart - firstRun.visibleStart),
-        sourceEnd: lastRun.sourceStart + Math.min(lastRun.text.length, wordEnd - lastRun.visibleStart),
-        emphasis: overlappingRuns.find((run) => run.emphasis !== null)?.emphasis ?? null,
-        punctuation: punctuationAfter(word),
-      });
+        for (const candidate of candidates) {
+          if (isOpeningPunctuation(candidate.text)) {
+            pendingPrefixStart ??= candidate.start;
+            pendingPrefix += candidate.text;
+            continue;
+          }
+
+          if (isClosingPunctuation(candidate.text)) {
+            const previous = tokens[tokens.length - 1];
+            if (previous && previous.index >= tokenStart) {
+              previous.displayText += candidate.text;
+              previous.visibleText = previous.displayText;
+              previous.spokenText += candidate.text;
+              previous.sourceEnd = sourceEndForVisibleOffset(runRanges, candidate.end);
+              previous.punctuation = punctuationAfter(previous.displayText);
+            }
+            continue;
+          }
+
+          const displayText = pendingPrefix + candidate.text;
+          const prefixStart = pendingPrefixStart;
+          pendingPrefix = "";
+          pendingPrefixStart = null;
+          const overlappingRuns = runRanges.filter((run) => run.visibleStart < candidate.end && run.visibleEnd > candidate.start);
+          const styles = [...new Set(overlappingRuns.flatMap((run) => run.emphasisStyles))];
+          const firstRun = overlappingRuns[0];
+          const lastRun = overlappingRuns[overlappingRuns.length - 1];
+          const startOffset = prefixStart !== null
+            ? sourceOffsetForVisibleOffset(runRanges, prefixStart)
+            : firstRun
+            ? firstRun.sourceStart + Math.max(0, candidate.start - firstRun.visibleStart)
+            : lineOffset + prepared.contentOffset + candidate.start;
+          const endOffset = lastRun
+            ? lastRun.sourceStart + Math.min(lastRun.text.length, candidate.end - lastRun.visibleStart)
+            : startOffset + candidate.text.length;
+          const token: MarkdownToken = {
+            index: tokens.length,
+            displayText,
+            visibleText: displayText,
+            spokenText: displayText,
+            sourceStart: Math.max(0, startOffset),
+            sourceEnd: endOffset,
+            emphasis: styles[0] ?? null,
+            emphasisStyles: styles,
+            punctuation: punctuationAfter(displayText),
+          };
+          tokens.push(token);
+        }
+
+        blocks.push({
+          kind: prepared.kind,
+          ...(prepared.level ? { level: prepared.level } : {}),
+          visibleText: visibleLine,
+          tokenStart,
+          tokenEnd: tokens.length,
+        });
+      }
     }
-    blocks.push({
-      kind: prepared.kind,
-      ...(prepared.level ? { level: prepared.level } : {}),
-      visibleText: visibleLine,
-      tokenStart,
-      tokenEnd: tokens.length,
-    });
+    lineOffset += sourceLine.length;
+    lineOffset += newlineLengths[lineIndex] ?? 0;
   }
 
-  const visibleText = blocks.map((block) => block.visibleText).join("\n");
   return {
     sourceMarkdown,
-    visibleText,
+    visibleText: blocks.map((block) => block.visibleText).join("\n"),
     spokenText: tokens.map((token) => token.spokenText).join(" "),
     blocks,
     tokens,
   };
 }
 
-function prepareBlock(line: string): { kind: MarkdownBlock["kind"]; level?: number; content: string; contentOffset: number } {
+function prepareBlock(line: string): PreparedBlock {
   const heading = /^(#{1,6})\s+(.*)$/u.exec(line);
   if (heading) {
     const prefixLength = heading[1].length + 1;
@@ -76,30 +126,111 @@ function prepareBlock(line: string): { kind: MarkdownBlock["kind"]; level?: numb
   return { kind: "paragraph", content: line, contentOffset: 0 };
 }
 
-function tokenizeInline(source: string, absoluteStart: number): VisibleRun[] {
-  const normalized = source
-    .replace(/!\[([^\]]*)\]\([^)]*\)/gu, "$1")
-    .replace(/\[([^\]]+)\]\([^)]*\)/gu, "$1")
-    .replace(/`([^`]+)`/gu, "$1");
-  const runs: VisibleRun[] = [];
-  const syntax = /(\*\*|__)(.+?)\1|(~~)(.+?)\3|(\*|_)(.+?)\5/gu;
+function parseInline(source: string, sourceOffset: number, inherited: EmphasisStyle[] = []): InlineRun[] {
+  const runs: InlineRun[] = [];
+  const append = (text: string, start: number, styles = inherited) => {
+    if (!text) return;
+    const previous = runs[runs.length - 1];
+    if (previous && sameStyles(previous.emphasisStyles, styles) && previous.sourceStart + previous.text.length === start) {
+      previous.text += text;
+    } else {
+      runs.push({ text, emphasisStyles: [...styles], sourceStart: start });
+    }
+  };
+
   let cursor = 0;
-  for (const match of normalized.matchAll(syntax)) {
-    const start = match.index ?? 0;
-    if (start > cursor) runs.push({ text: normalized.slice(cursor, start), emphasis: null, sourceStart: absoluteStart + cursor });
-    const marker = match[1] ?? match[3] ?? match[5];
-    const text = match[2] ?? match[4] ?? match[6] ?? "";
-    const emphasis: MarkdownToken["emphasis"] = marker === "~~" ? "strikethrough" : marker.length === 2 ? "strong" : "emphasis";
-    runs.push({ text, emphasis, sourceStart: absoluteStart + start + marker.length });
-    cursor = start + match[0].length;
+  while (cursor < source.length) {
+    const remainder = source.slice(cursor);
+    const imageOrLink = /^(?:!\[([^\]]*)\]\([^)]*\)|\[([^\]]+)\]\([^)]*\))/u.exec(remainder);
+    if (imageOrLink) {
+      const label = imageOrLink[1] ?? imageOrLink[2] ?? "";
+      const labelOffset = imageOrLink[0].indexOf(label);
+      append(label, sourceOffset + cursor + labelOffset);
+      cursor += imageOrLink[0].length;
+      continue;
+    }
+
+    const code = /^`([^`]+)`/u.exec(remainder);
+    if (code) {
+      const inner = code[1];
+      append(inner, sourceOffset + cursor + 1);
+      cursor += code[0].length;
+      continue;
+    }
+
+    const marker = /^(\*\*|__|~~|\*|_)/u.exec(remainder)?.[0];
+    if (marker) {
+      const closing = source.indexOf(marker, cursor + marker.length);
+      if (closing > cursor + marker.length) {
+        const style: EmphasisStyle = marker === "~~" ? "strikethrough" : marker.length === 2 ? "strong" : "emphasis";
+        const innerStart = cursor + marker.length;
+        const inner = source.slice(innerStart, closing);
+        for (const run of parseInline(inner, sourceOffset + innerStart, [...inherited, style])) {
+          append(run.text, run.sourceStart, run.emphasisStyles);
+        }
+        cursor = closing + marker.length;
+        continue;
+      }
+    }
+
+    append(source[cursor], sourceOffset + cursor);
+    cursor += 1;
   }
-  if (cursor < normalized.length) runs.push({ text: normalized.slice(cursor), emphasis: null, sourceStart: absoluteStart + cursor });
+
   return runs;
 }
 
+function wordCandidates(visibleText: string): TokenCandidate[] {
+  const result: TokenCandidate[] = [];
+  for (const match of visibleText.matchAll(/\S+/gu)) {
+    const text = match[0];
+    const start = match.index ?? 0;
+    result.push({ text, start, end: start + text.length });
+  }
+  return result;
+}
+
+function getRunRanges(runs: InlineRun[]): Array<InlineRun & { visibleStart: number; visibleEnd: number }> {
+  let visibleOffset = 0;
+  return runs.map((run) => {
+    const visibleStart = visibleOffset;
+    visibleOffset += run.text.length;
+    return { ...run, visibleStart, visibleEnd: visibleOffset };
+  });
+}
+
+function sourceEndForVisibleOffset(
+  runs: Array<InlineRun & { visibleStart: number; visibleEnd: number }>,
+  visibleOffset: number,
+): number {
+  const run = runs.find((candidate) => visibleOffset > candidate.visibleStart && visibleOffset <= candidate.visibleEnd);
+  return run ? run.sourceStart + visibleOffset - run.visibleStart : 0;
+}
+
+function sourceOffsetForVisibleOffset(
+  runs: Array<InlineRun & { visibleStart: number; visibleEnd: number }>,
+  visibleOffset: number,
+): number {
+  const run = runs.find((candidate) => visibleOffset >= candidate.visibleStart && visibleOffset < candidate.visibleEnd);
+  return run ? run.sourceStart + visibleOffset - run.visibleStart : 0;
+}
+
+function isOpeningPunctuation(text: string): boolean {
+  return /^[¿¡([{“«]+$/u.test(text);
+}
+
+function isClosingPunctuation(text: string): boolean {
+  return /^[,.;:!?…)}\]”’"'»]+$/u.test(text);
+}
+
 function punctuationAfter(word: string): MarkdownToken["punctuation"] {
-  if (/[.!?…][”’"')\]]*$/u.test(word)) return "sentence";
-  if (/;[”’"')\]]*$/u.test(word)) return "semicolon";
-  if (/,[”’"')\]]*$/u.test(word)) return "comma";
+  if (/[.!?…][”’"')\]»}]*$/u.test(word)) return "sentence";
+  if (/;[”’"')\]»}]*$/u.test(word)) return "semicolon";
+  if (/:+[”’"')\]»}]*$/u.test(word)) return "colon";
+  if (/[,”’"')\]»}]+$/u.test(word)) return "comma";
   return null;
+}
+
+function sameStyles(first: EmphasisStyle[], second: EmphasisStyle[]): boolean {
+  return first.length === second.length && first.every((style, index) => style === second[index]);
 }
