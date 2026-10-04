@@ -13,6 +13,8 @@ Este archivo recoge decisiones y correcciones que deben mantenerse durante el de
 - Los proyectos `.scriptarc` conservan texto y configuración como JSON versionado; se guarda un borrador local y los archivos elegidos por el usuario usan los diálogos Tauri.
 - La grabación manual guarda un intervalo por token pronunciable. Cambiar el Markdown invalida esos tiempos para que no se asignen a palabras distintas; la puntuación sigue unida a su última palabra.
 - En RECORD, cada avance mide la palabra actual; retroceder elimina solo los intervalos desde esa palabra y reinicia su cronómetro. El último avance completa la sesión, sin paso extra para su signo final.
+- El cursor, el temporizador reanudable y el progreso pertenecen al composable de playback; la vista de texto solo presenta bloques y palabras, para que el formato Markdown no determine la unidad de avance.
+- La vista mantiene todos los párrafos y centra suavemente la palabra activa; la barra de progreso busca por token y muestra tiempo usando las duraciones automáticas o grabadas.
 - El parser de Markdown conserva los encabezados y los estilos inline como metadata por palabra; el signo de puntuación unido o separado por un espacio nunca crea un paso independiente.
 - La conversión cardinal usa `n2words` con importaciones regionales `es` y `en`; su licencia MIT, módulos pequeños y cero dependencias permiten cubrir ambos idiomas sin mantener gramática numérica propia. Un adaptador local reconoce agrupadores y conserva la puntuación del token.
 - El pacing automático mide la longitud de la pronunciación derivada (no el Markdown ni el rótulo numérico), escala con palabras por minuto, añade pausas de puntuación y limita cada palabra a 250–8000 ms para prevenir tiempos extremos.

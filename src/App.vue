@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { isTauri } from "@tauri-apps/api/core";
 import ScriptEditor from "./features/editor/ScriptEditor.vue";
 import { parseMarkdown } from "./features/markdown/parseMarkdown";
@@ -15,6 +15,9 @@ import {
   startManualRecording,
 } from "./features/teleprompter/manualTiming";
 import SettingsPanel from "./features/settings/SettingsPanel.vue";
+import TeleprompterText from "./features/teleprompter/TeleprompterText.vue";
+import { formatPlaybackTime } from "./features/teleprompter/playbackState";
+import { usePlayback } from "./features/teleprompter/usePlayback";
 import type { ReadingWord, TimingMode } from "./shared/types";
 
 type Screen = "editor" | "teleprompter";
@@ -31,20 +34,24 @@ const sourceMarkdown = computed({
   },
 });
 const timingMode = computed(() => project.value.timingMode);
-const cursor = ref(0);
 const manualSession = ref(createManualRecordingSession(0));
 const isRecording = computed(() => manualSession.value.status === "recording");
-const document = computed(() => parseMarkdown(sourceMarkdown.value));
+const parsedMarkdown = computed(() => parseMarkdown(sourceMarkdown.value));
+const automaticWords = computed(() => createAutomaticReadingWords(parsedMarkdown.value, project.value.automaticTiming, project.value.preferences.wordsPerMinute));
 const words = computed<ReadingWord[]>(() => timingMode.value === "automatic"
-  ? createAutomaticReadingWords(document.value, project.value.automaticTiming, project.value.preferences.wordsPerMinute)
-  : document.value.tokens.map((token) => ({ ...token, sourceTokenIndex: token.index, durationMilliseconds: 0 })));
-const isPlaying = ref(false);
+  ? automaticWords.value
+  : parsedMarkdown.value.tokens.map((token) => ({ ...token, sourceTokenIndex: token.index, durationMilliseconds: 0 })));
+const playback = usePlayback(words, playbackDuration);
+const { cursor, isPlaying, elapsedMilliseconds, remainingMilliseconds, progressPercent } = playback;
 const filePath = ref<string | null>(null);
 const notice = ref("");
 const settingsOpen = ref(false);
-const wordElements = new Map<number, HTMLElement>();
+const automaticLanguagePicker = ref(false);
+const appRoot = ref<HTMLElement | null>(null);
+const controlsVisible = ref(true);
+const isFullscreen = ref(false);
 let noticeTimeout: number | undefined;
-let playbackTimer: number | undefined;
+let controlsHideTimeout: number | undefined;
 
 watch(project, (value) => {
   try {
@@ -56,12 +63,14 @@ watch(project, (value) => {
 
 function start(mode: TimingMode) {
   settingsOpen.value = false;
+  automaticLanguagePicker.value = false;
   stopRecording();
   stopPlayback();
   project.value = { ...project.value, timingMode: mode };
-  manualSession.value = createManualRecordingSession(mode === "manual" ? document.value.tokens.length : 0, project.value.manualTimings);
-  cursor.value = 0;
+  manualSession.value = createManualRecordingSession(mode === "manual" ? parsedMarkdown.value.tokens.length : 0, project.value.manualTimings);
+  playback.restart();
   screen.value = "teleprompter";
+  showControlsForStartup();
 }
 
 function showNotice(message: string) {
@@ -80,7 +89,7 @@ async function openProject() {
     manualSession.value = createManualRecordingSession(parseMarkdown(opened.project.sourceMarkdown).tokens.length, opened.project.manualTimings);
     settingsOpen.value = false;
     filePath.value = opened.filePath;
-    cursor.value = 0;
+    playback.restart();
     showNotice(`Proyecto abierto: ${opened.project.title}`);
   } catch (error) {
     showNotice(error instanceof Error ? error.message : "No se pudo abrir el proyecto.");
@@ -102,23 +111,78 @@ async function saveProject() {
 
 function handlePrompterKey(event: KeyboardEvent) {
   if (screen.value !== "teleprompter") return;
-  if (event.key === "ArrowRight") {
-    event.preventDefault();
-    advance();
-  } else if (event.key === "ArrowLeft") {
-    event.preventDefault();
-    retreat();
-  } else if (event.key === "Escape") {
-    returnToEditor();
+  const target = event.target;
+  if (target instanceof HTMLElement && target.closest("input, textarea, select, [contenteditable='true']")) return;
+  if (event.key === " " && target instanceof HTMLElement && target.closest("button")) return;
+
+  switch (event.key) {
+    case " ":
+      event.preventDefault();
+      if (isRecording.value) recordCurrentWord();
+      else togglePlayback();
+      break;
+    case "ArrowRight":
+      event.preventDefault();
+      advance();
+      break;
+    case "ArrowLeft":
+      event.preventDefault();
+      retreat();
+      break;
+    case "Home":
+      event.preventDefault();
+      if (!isRecording.value) playback.restart();
+      break;
+    case "End":
+      event.preventDefault();
+      if (!isRecording.value && !(timingMode.value === "manual" && manualSession.value.status === "ready")) {
+        playback.seek(words.value.length - 1);
+      }
+      break;
+    case "Escape":
+      if (document.fullscreenElement) {
+        event.preventDefault();
+        void document.exitFullscreen();
+      } else if (!isFullscreen.value) {
+        returnToEditor();
+      }
+      break;
   }
 }
 
-onMounted(() => window.addEventListener("keydown", handlePrompterKey));
+function handlePrompterPointer(event: MouseEvent) {
+  if (screen.value !== "teleprompter") return;
+  const nearTop = event.clientY <= 86;
+  const nearBottom = window.innerHeight - event.clientY <= 112;
+  if (!nearTop && !nearBottom) return;
+  controlsVisible.value = true;
+  if (controlsHideTimeout !== undefined) window.clearTimeout(controlsHideTimeout);
+  controlsHideTimeout = window.setTimeout(() => { controlsVisible.value = false; }, 2400);
+}
+
+function handleFullscreenChange() {
+  isFullscreen.value = document.fullscreenElement !== null;
+}
+
+onMounted(() => {
+  window.addEventListener("keydown", handlePrompterKey);
+  window.addEventListener("mousemove", handlePrompterPointer);
+  document.addEventListener("fullscreenchange", handleFullscreenChange);
+});
 onBeforeUnmount(() => {
   stopPlayback();
   window.removeEventListener("keydown", handlePrompterKey);
+  window.removeEventListener("mousemove", handlePrompterPointer);
+  document.removeEventListener("fullscreenchange", handleFullscreenChange);
   if (noticeTimeout !== undefined) window.clearTimeout(noticeTimeout);
+  if (controlsHideTimeout !== undefined) window.clearTimeout(controlsHideTimeout);
 });
+
+function showControlsForStartup() {
+  controlsVisible.value = true;
+  if (controlsHideTimeout !== undefined) window.clearTimeout(controlsHideTimeout);
+  controlsHideTimeout = window.setTimeout(() => { controlsVisible.value = false; }, 2400);
+}
 
 function returnToEditor() {
   settingsOpen.value = false;
@@ -133,20 +197,18 @@ function advance() {
     return;
   }
   if (timingMode.value === "manual" && manualSession.value.status === "ready") return;
-  stopPlayback();
-  cursor.value = Math.min(cursor.value + 1, words.value.length);
+  playback.next();
 }
 
 function retreat() {
   if (isRecording.value) {
     manualSession.value = retreatManualRecording(manualSession.value, performance.now());
     project.value = { ...project.value, manualTimings: manualSession.value.timings };
-    cursor.value = manualSession.value.cursor;
+    playback.seek(manualSession.value.cursor);
     return;
   }
   stopRecording();
-  stopPlayback();
-  cursor.value = Math.max(0, cursor.value - 1);
+  playback.previous();
 }
 
 function toggleRecording() {
@@ -158,7 +220,7 @@ function toggleRecording() {
   stopPlayback();
   manualSession.value = startManualRecording(createManualRecordingSession(words.value.length), performance.now());
   project.value = { ...project.value, timingMode: "manual", manualTimings: [] };
-  cursor.value = manualSession.value.cursor;
+  playback.restart();
   showNotice("Grabando. Lee la palabra resaltada y pulsa → al terminar.");
 }
 
@@ -169,7 +231,7 @@ function recordCurrentWord() {
   }
   manualSession.value = advanceManualRecording(manualSession.value, performance.now());
   project.value = { ...project.value, manualTimings: manualSession.value.timings };
-  cursor.value = manualSession.value.cursor;
+  playback.seek(manualSession.value.cursor);
   if (manualSession.value.status === "review") showNotice("Ritmo manual grabado. Puedes revisar, reproducir o volver a grabar.");
 }
 
@@ -179,7 +241,7 @@ function stopRecording(captureCurrentWord = false) {
     ? finishManualRecording(manualSession.value, performance.now())
     : { ...manualSession.value, status: "review", lastAdvanceAt: null };
   project.value = { ...project.value, manualTimings: manualSession.value.timings };
-  cursor.value = manualSession.value.cursor;
+  playback.seek(manualSession.value.cursor);
   if (captureCurrentWord) showNotice("Grabación detenida. Puedes revisar, editar o reproducir el ritmo registrado.");
 }
 
@@ -191,59 +253,45 @@ function togglePlayback() {
   if (isRecording.value) stopRecording();
   if (!words.value.length) return;
   if (timingMode.value === "manual" && !project.value.manualTimings.length) {
-    showNotice("Graba primero tu ritmo con el botón Grabar.");
+    showNotice("Graba primero tu ritmo con el botón RECORD.");
     return;
   }
-  if (cursor.value >= words.value.length) cursor.value = 0;
-  isPlaying.value = true;
-  scheduleNextWord();
-}
-
-function scheduleNextWord() {
-  const word = words.value[cursor.value];
-  if (!word || !isPlaying.value) {
-    stopPlayback();
-    return;
-  }
-  playbackTimer = window.setTimeout(() => {
-    if (cursor.value >= words.value.length - 1) {
-      cursor.value = words.value.length;
-      stopPlayback();
-      return;
-    }
-    cursor.value += 1;
-    scheduleNextWord();
-  }, playbackDuration(word));
+  playback.play();
 }
 
 function playbackDuration(word: ReadingWord): number {
   if (timingMode.value === "automatic") return word.durationMilliseconds;
-  const speedScale = 160 / project.value.preferences.wordsPerMinute;
-  const fallback = Math.max(250, Math.round(word.spokenText.replace(/[.,;:!?…)}\]”’"'»}]+$/u, "").length * project.value.automaticTiming.baseMillisecondsPerCharacter * speedScale));
+  const fallback = automaticWords.value[word.sourceTokenIndex]?.durationMilliseconds ?? 500;
   return manualWordDuration(project.value.manualTimings, word.sourceTokenIndex, fallback);
 }
 
 function stopPlayback() {
-  isPlaying.value = false;
-  if (playbackTimer !== undefined) window.clearTimeout(playbackTimer);
-  playbackTimer = undefined;
+  playback.pause();
 }
 
-function setWordElement(element: unknown, index: number) {
-  if (element instanceof HTMLElement) wordElements.set(index, element);
-  else wordElements.delete(index);
+function seekFromProgress(event: Event) {
+  playback.seek(Number((event.target as HTMLInputElement).value));
 }
 
-watch([screen, cursor], () => {
-  if (screen.value !== "teleprompter") return;
-  void nextTick(() => wordElements.get(cursor.value)?.scrollIntoView({ behavior: "smooth", block: "center" }));
-}, { flush: "post" });
+function adjustFontSize(amount: number) {
+  project.value.preferences.fontSize = Math.max(30, Math.min(96, project.value.preferences.fontSize + amount));
+}
+
+async function toggleFullscreen() {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await appRoot.value?.requestFullscreen();
+  } catch {
+    showNotice("El navegador no permitió cambiar a pantalla completa.");
+  }
+}
 </script>
 
 <template>
   <main
+    ref="appRoot"
     class="app-shell"
-    :class="[`screen-${screen}`, `theme-${project.preferences.theme}`]"
+    :class="[`screen-${screen}`, `theme-${project.preferences.theme}`, { 'controls-visible': controlsVisible }]"
     :style="{ '--prompter-font-size': `${project.preferences.fontSize}px` }"
   >
     <template v-if="screen === 'editor'">
@@ -302,7 +350,8 @@ watch([screen, cursor], () => {
               class="button button-primary"
               type="button"
               :disabled="!sourceMarkdown.trim()"
-              @click="start('automatic')"
+              :aria-expanded="automaticLanguagePicker"
+              @click="automaticLanguagePicker = !automaticLanguagePicker"
             >
               Automático <span aria-hidden="true">→</span>
             </button>
@@ -332,6 +381,25 @@ watch([screen, cursor], () => {
             </button>
           </div>
         </div>
+        <div
+          v-if="automaticLanguagePicker"
+          class="language-choice"
+        >
+          <label>
+            <span>Idioma para leer los números</span>
+            <select v-model="project.automaticTiming.language">
+              <option value="es">Español</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          <button
+            class="button button-primary"
+            type="button"
+            @click="start('automatic')"
+          >
+            Empezar <span aria-hidden="true">→</span>
+          </button>
+        </div>
         <p class="editor-hint">
           Pega o escribe tu texto; tus palabras siempre se quedan contigo.
         </p>
@@ -349,7 +417,10 @@ watch([screen, cursor], () => {
     </template>
 
     <template v-else>
-      <header class="prompter-toolbar">
+      <header
+        class="prompter-toolbar"
+        :class="{ 'controls-hidden': !controlsVisible }"
+      >
         <button
           class="text-button"
           type="button"
@@ -379,37 +450,11 @@ watch([screen, cursor], () => {
         v-model:font-size="project.preferences.fontSize"
         @close="settingsOpen = false"
       />
-      <section
-        class="prompter-view"
-        aria-label="Teleprompter"
-      >
-        <div
-          class="prompter-text"
-          aria-live="polite"
-        >
-          <span
-            v-for="(word, index) in words"
-            :key="`${index}-${word.visibleText}`"
-            :ref="(element) => setWordElement(element, index)"
-            :class="[
-              { 'word-current': index === cursor, 'word-spoken': index < cursor },
-              word.emphasis ? `word-${word.emphasis}` : '',
-            ]"
-          >{{ word.visibleText }} </span>
-        </div>
-        <p
-          v-if="!words.length"
-          class="empty-prompter"
-        >
-          Vuelve al editor y coloca tu texto.
-        </p>
-      </section>
-      <p
-        v-if="timingMode === 'manual'"
-        class="manual-instruction"
-      >
-        {{ isRecording ? "Lee la palabra blanca y pulsa → al terminarla; ← vuelve una palabra y permite repetirla." : manualSession.status === "review" ? "Grabación lista para revisar. Puedes reproducirla o pulsar RECORD para empezar de nuevo." : "Pulsa RECORD y lee la palabra blanca; avanza con → al terminar cada palabra." }}
-      </p>
+      <TeleprompterText
+        :blocks="parsedMarkdown.blocks"
+        :words="words"
+        :cursor="cursor"
+      />
       <p
         class="notice notice-dark"
         role="status"
@@ -417,43 +462,106 @@ watch([screen, cursor], () => {
       >
         {{ notice }}
       </p>
-      <footer class="prompter-controls">
-        <button
-          class="button button-secondary"
-          type="button"
-          aria-label="Retroceder palabra"
-          @click="retreat"
-        >
-          ←
-        </button>
-        <button
+      <footer
+        class="prompter-controls"
+        :class="{ 'controls-hidden': !controlsVisible }"
+        aria-label="Controles del teleprompter"
+      >
+        <div class="playback-progress">
+          <span>{{ formatPlaybackTime(elapsedMilliseconds) }}</span>
+          <input
+            class="progress-slider"
+            type="range"
+            min="0"
+            :max="words.length"
+            :value="cursor"
+            :style="{ '--progress': `${progressPercent}%` }"
+            :disabled="isRecording || (timingMode === 'manual' && manualSession.status === 'ready')"
+            aria-label="Progreso de lectura"
+            @input="seekFromProgress"
+          >
+          <span>-{{ formatPlaybackTime(remainingMilliseconds) }}</span>
+        </div>
+        <p
           v-if="timingMode === 'manual'"
-          class="button button-secondary playback-button"
-          :class="{ 'recording-button': isRecording }"
-          type="button"
-          :disabled="!words.length"
-          @click="toggleRecording"
+          class="manual-instruction"
         >
-          {{ isRecording ? "■ DETENER" : manualSession.status === "review" ? "● REGRABAR" : "● RECORD" }}
-        </button>
-        <button
-          v-if="timingMode === 'automatic' || project.manualTimings.length > 0"
-          class="button button-secondary playback-button"
-          type="button"
-          :disabled="!words.length || (timingMode === 'manual' && (!project.manualTimings.length || isRecording))"
-          @click="togglePlayback"
-        >
-          {{ isPlaying ? "Pausar" : "Reproducir" }}
-        </button>
-        <span class="progress-label">{{ words.length ? `${Math.min(cursor + 1, words.length)} / ${words.length}` : "Sin texto" }}</span>
-        <button
-          class="button button-primary"
-          type="button"
-          aria-label="Avanzar palabra"
-          @click="advance"
-        >
-          →
-        </button>
+          {{ isRecording ? "Lee la palabra blanca y pulsa → al terminarla; ← vuelve una palabra y permite repetirla." : manualSession.status === "review" ? "Grabación lista para revisar o reproducir; RECORD vuelve a empezar." : "Sitúate en la primera palabra y pulsa RECORD para medir tu ritmo." }}
+        </p>
+        <div class="control-buttons">
+          <button
+            class="button button-secondary"
+            type="button"
+            aria-label="Reiniciar"
+            title="Reiniciar (Inicio)"
+            :disabled="isRecording"
+            @click="playback.restart"
+          >
+            ↺
+          </button>
+          <button
+            class="button button-secondary"
+            type="button"
+            aria-label="Palabra anterior"
+            title="Anterior (←)"
+            @click="retreat"
+          >
+            ←
+          </button>
+          <button
+            v-if="timingMode === 'manual'"
+            class="button button-secondary playback-button"
+            :class="{ 'recording-button': isRecording }"
+            type="button"
+            :disabled="!words.length"
+            @click="toggleRecording"
+          >
+            {{ isRecording ? "■ DETENER" : manualSession.status === "review" ? "● REGRABAR" : "● RECORD" }}
+          </button>
+          <button
+            v-if="timingMode === 'automatic' || project.manualTimings.length > 0"
+            class="button button-secondary playback-button"
+            type="button"
+            :disabled="!words.length || (timingMode === 'manual' && (!project.manualTimings.length || isRecording))"
+            @click="togglePlayback"
+          >
+            {{ isPlaying ? "Pausa" : "Play" }}
+          </button>
+          <button
+            class="button button-secondary"
+            type="button"
+            aria-label="Siguiente palabra"
+            title="Siguiente (→)"
+            @click="advance"
+          >
+            →
+          </button>
+          <button
+            class="button button-secondary font-button"
+            type="button"
+            aria-label="Reducir tamaño de letra"
+            @click="adjustFontSize(-4)"
+          >
+            A−
+          </button>
+          <button
+            class="button button-secondary font-button"
+            type="button"
+            aria-label="Aumentar tamaño de letra"
+            @click="adjustFontSize(4)"
+          >
+            A+
+          </button>
+          <button
+            class="button button-secondary"
+            type="button"
+            :aria-label="isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'"
+            :title="isFullscreen ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'"
+            @click="toggleFullscreen"
+          >
+            {{ isFullscreen ? "⤢" : "⛶" }}
+          </button>
+        </div>
       </footer>
     </template>
   </main>
