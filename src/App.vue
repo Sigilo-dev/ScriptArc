@@ -6,6 +6,7 @@ import { parseMarkdown } from "./features/markdown/parseMarkdown";
 import { createProject, updateProjectMarkdown } from "./features/project/projectModel";
 import { loadLocalProject, openProjectFile, saveLocalProject, saveProjectFile } from "./features/project/projectPersistence";
 import { createAutomaticReadingWords } from "./features/teleprompter/automaticTiming";
+import { manualWordDuration, upsertManualWordTiming } from "./features/teleprompter/manualTiming";
 import type { ReadingWord, TimingMode } from "./shared/types";
 
 type Screen = "editor" | "teleprompter";
@@ -18,6 +19,7 @@ const sourceMarkdown = computed({
 });
 const timingMode = computed(() => project.value.timingMode);
 const cursor = ref(0);
+const isRecording = ref(false);
 const document = computed(() => parseMarkdown(sourceMarkdown.value));
 const words = computed<ReadingWord[]>(() => timingMode.value === "automatic"
   ? createAutomaticReadingWords(document.value, project.value.automaticTiming)
@@ -28,6 +30,7 @@ const notice = ref("");
 const wordElements = new Map<number, HTMLElement>();
 let noticeTimeout: number | undefined;
 let playbackTimer: number | undefined;
+let lastManualTimestamp = 0;
 
 watch(project, (value) => {
   try {
@@ -38,6 +41,7 @@ watch(project, (value) => {
 }, { deep: true });
 
 function start(mode: TimingMode) {
+  stopRecording();
   stopPlayback();
   project.value = { ...project.value, timingMode: mode };
   cursor.value = 0;
@@ -54,6 +58,8 @@ async function openProject() {
   try {
     const opened = await openProjectFile();
     if (!opened) return;
+    stopRecording();
+    stopPlayback();
     project.value = opened.project;
     filePath.value = opened.filePath;
     cursor.value = 0;
@@ -97,18 +103,63 @@ onBeforeUnmount(() => {
 });
 
 function returnToEditor() {
+  stopRecording();
   stopPlayback();
   screen.value = "editor";
 }
 
 function advance() {
+  if (timingMode.value === "manual" && isRecording.value) {
+    recordCurrentWord();
+    return;
+  }
   stopPlayback();
   cursor.value = Math.min(cursor.value + 1, words.value.length);
 }
 
 function retreat() {
+  stopRecording();
   stopPlayback();
   cursor.value = Math.max(0, cursor.value - 1);
+}
+
+function toggleRecording() {
+  if (isRecording.value) {
+    stopRecording();
+    return;
+  }
+  if (!words.value.length) return;
+  stopPlayback();
+  if (cursor.value >= words.value.length) cursor.value = 0;
+  const retainedTimings = project.value.manualTimings.filter((timing) => timing.tokenIndex < cursor.value);
+  project.value = { ...project.value, timingMode: "manual", manualTimings: retainedTimings };
+  lastManualTimestamp = performance.now();
+  isRecording.value = true;
+  showNotice("Grabando. Lee la palabra resaltada y pulsa → al terminar.");
+}
+
+function recordCurrentWord() {
+  const word = words.value[cursor.value];
+  if (!word || !isRecording.value) {
+    stopRecording();
+    return;
+  }
+  const now = performance.now();
+  const updatedTimings = upsertManualWordTiming(project.value.manualTimings, word.sourceTokenIndex, now - lastManualTimestamp);
+  project.value = {
+    ...project.value,
+    manualTimings: updatedTimings,
+  };
+  cursor.value += 1;
+  lastManualTimestamp = now;
+  if (cursor.value >= words.value.length) {
+    stopRecording();
+    showNotice("Ritmo manual grabado. Puedes reproducirlo o volver a grabar.");
+  }
+}
+
+function stopRecording() {
+  isRecording.value = false;
 }
 
 function togglePlayback() {
@@ -116,13 +167,18 @@ function togglePlayback() {
     stopPlayback();
     return;
   }
+  if (isRecording.value) stopRecording();
   if (!words.value.length) return;
+  if (timingMode.value === "manual" && !project.value.manualTimings.length) {
+    showNotice("Graba primero tu ritmo con el botón Grabar.");
+    return;
+  }
   if (cursor.value >= words.value.length) cursor.value = 0;
   isPlaying.value = true;
-  scheduleAutomaticStep();
+  scheduleNextWord();
 }
 
-function scheduleAutomaticStep() {
+function scheduleNextWord() {
   const word = words.value[cursor.value];
   if (!word || !isPlaying.value) {
     stopPlayback();
@@ -135,8 +191,14 @@ function scheduleAutomaticStep() {
       return;
     }
     cursor.value += 1;
-    scheduleAutomaticStep();
-  }, word.durationMilliseconds);
+    scheduleNextWord();
+  }, playbackDuration(word));
+}
+
+function playbackDuration(word: ReadingWord): number {
+  if (timingMode.value === "automatic") return word.durationMilliseconds;
+  const fallback = Math.max(250, word.visibleText.length * project.value.automaticTiming.baseMillisecondsPerCharacter);
+  return manualWordDuration(project.value.manualTimings, word.sourceTokenIndex, fallback);
 }
 
 function stopPlayback() {
@@ -262,7 +324,9 @@ watch([screen, cursor], () => {
         >
           ← Editor
         </button>
-        <span class="mode-label">{{ timingMode === "automatic" ? "Modo automático" : "Modo manual" }}</span>
+        <span class="mode-label">
+          {{ timingMode === "automatic" ? "Modo automático" : "Modo manual" }}{{ isRecording ? " · Grabando" : "" }}
+        </span>
         <button
           class="icon-button"
           type="button"
@@ -298,6 +362,12 @@ watch([screen, cursor], () => {
         </p>
       </section>
       <p
+        v-if="timingMode === 'manual'"
+        class="manual-instruction"
+      >
+        {{ isRecording ? "Lee la palabra blanca y pulsa → cuando termines; cada toque registra su duración." : "Pulsa Grabar, lee la palabra blanca y avanza con → al terminar cada palabra." }}
+      </p>
+      <p
         class="notice notice-dark"
         role="status"
         aria-live="polite"
@@ -314,10 +384,19 @@ watch([screen, cursor], () => {
           ←
         </button>
         <button
-          v-if="timingMode === 'automatic'"
+          v-if="timingMode === 'manual'"
           class="button button-secondary playback-button"
+          :class="{ 'recording-button': isRecording }"
           type="button"
           :disabled="!words.length"
+          @click="toggleRecording"
+        >
+          {{ isRecording ? "Detener" : "Grabar" }}
+        </button>
+        <button
+          class="button button-secondary playback-button"
+          type="button"
+          :disabled="!words.length || (timingMode === 'manual' && (!project.manualTimings.length || isRecording))"
           @click="togglePlayback"
         >
           {{ isPlaying ? "Pausar" : "Reproducir" }}

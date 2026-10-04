@@ -40,10 +40,12 @@ export function createProject(sourceMarkdown = "", now = new Date()): ScriptProj
 }
 
 export function updateProjectMarkdown(project: ScriptProject, sourceMarkdown: string, now = new Date()): ScriptProject {
+  const sourceChanged = sourceMarkdown !== project.sourceMarkdown;
   return {
     ...project,
     title: inferProjectTitle(sourceMarkdown),
     sourceMarkdown,
+    ...(sourceChanged ? { manualTimings: [] } : {}),
     updatedAt: now.toISOString(),
   };
 }

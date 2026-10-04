@@ -11,6 +11,7 @@ Este archivo recoge decisiones y correcciones que deben mantenerse durante el de
 - La interfaz base utiliza variables CSS y tipografía del sistema para seguir siendo simple y funcionar sin conexión.
 - El guardado debe ser local. No añadir servicios remotos, cuentas, IA ni una base de datos.
 - Los proyectos `.scriptarc` conservan texto y configuración como JSON versionado; se guarda un borrador local y los archivos elegidos por el usuario usan los diálogos Tauri.
+- La grabación manual guarda un intervalo por token pronunciable. Cambiar el Markdown invalida esos tiempos para que no se asignen a palabras distintas; la puntuación sigue unida a su última palabra.
 - Mantener organización pequeña por feature; evitar capas ceremoniales y dependencias que no resuelvan una necesidad del producto.
 
 ## Problemas encontrados y solución
@@ -19,6 +20,7 @@ Este archivo recoge decisiones y correcciones que deben mantenerse durante el de
 - **El scaffold traía nombre, logos y saludo de ejemplo.** Se cambió el nombre a ScriptArc, se eliminó el comando de saludo y el plugin de apertura que no se usaba, y se preparó una pantalla inicial propia.
 - **La primera edición de documentación esperaba texto distinto al README real del scaffold.** No se aplicó parcialmente. Se verificó el contenido presente y se reemplazó por los dos documentos solicitados: `README.md` y `audir.md`.
 - **El plugin de sistema de archivos de Tauri exige permisos y scopes explícitos.** Se habilitaron únicamente lectura y escritura de texto; la app obtiene acceso a la ubicación elegida mediante los diálogos de abrir/guardar, sin dar acceso global a la carpeta del usuario.
+- **El directorio temporal `scriptarc-scaffold/` permanece en el disco y está ignorado por Git.** La política del entorno bloqueó su borrado recursivo. La raíz `E:\ScriptArc` es el único proyecto activo; no editar ni compilar el backup temporal. Se puede limpiar manualmente al terminar si se desea.
 
 ## Reglas para las siguientes features
 

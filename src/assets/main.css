@@ -80,6 +80,8 @@ h1 span { color: #9aa7b8; }
 .prompter-text .word-strikethrough { text-decoration: line-through; }
 .empty-prompter { color: #9ab0ce; }
 .notice-dark { width: 100%; margin: -20px 0 8px; color: #a7c3f6; text-align: center; }
+.manual-instruction { margin: 0 24px 12px; color: #9ab0ce; font-size: 12px; text-align: center; }
+.recording-button { border-color: rgba(255,115,132,.55) !important; color: #ffb3bf !important; }
 .prompter-controls { position: sticky; bottom: 0; min-height: 80px; display: flex; justify-content: center; align-items: center; gap: 24px; border-top: 1px solid rgba(255,255,255,.1); background: rgba(7,26,53,.92); backdrop-filter: blur(12px); }
 .prompter-controls .button-secondary { border-color: rgba(255,255,255,.18); background: transparent; color: white; }
 .playback-button { min-width: 104px; }

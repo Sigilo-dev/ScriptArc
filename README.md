@@ -15,7 +15,7 @@ El proyecto está pensado para ser abierto y modificable. La aplicación guarda 
 ## Uso
 
 1. Abre ScriptArc y pega o escribe el guion en el editor.
-2. Elige **Automático** para que la aplicación calcule el ritmo, o **Manual** para registrar tu ritmo al avanzar palabra por palabra.
+2. Elige **Automático** para que la aplicación calcule el ritmo, o **Manual** para registrar tu ritmo. En modo manual, pulsa **Grabar**, lee la palabra blanca y pulsa la flecha derecha al terminar cada palabra; después puedes reproducir ese ritmo.
 3. Lee el texto en la pantalla del teleprompter. Usa las flechas para avanzar o retroceder y **Esc** para volver al editor.
 4. Guarda o abre un proyecto local con extensión `.scriptarc` para continuar más tarde. En la app de escritorio se usa el selector nativo de archivos; la vista web permite abrir y descargar proyectos.
 5. Selecciona un tema desde la configuración.

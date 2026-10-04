@@ -18,6 +18,11 @@ describe("project model", () => {
     expect(deserializeProject(serializeProject(updated)).sourceMarkdown).toBe(original);
   });
 
+  it("clears word timings after source Markdown changes", () => {
+    const project = { ...createProject("one two"), manualTimings: [{ tokenIndex: 0, durationMilliseconds: 500 }] };
+    expect(updateProjectMarkdown(project, "one changed").manualTimings).toEqual([]);
+  });
+
   it("migrates the first legacy format into the current version", () => {
     const migrated = deserializeProject(JSON.stringify({ formatVersion: 0, markdown: "Hello", mode: "manual", language: "en" }));
     expect(migrated.formatVersion).toBe(1);
