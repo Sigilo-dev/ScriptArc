@@ -1,23 +1,92 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { isTauri } from "@tauri-apps/api/core";
 import ScriptEditor from "./features/editor/ScriptEditor.vue";
 import { parseMarkdown } from "./features/markdown/parseMarkdown";
+import { createProject, updateProjectMarkdown } from "./features/project/projectModel";
+import { loadLocalProject, openProjectFile, saveLocalProject, saveProjectFile } from "./features/project/projectPersistence";
+import type { TimingMode } from "./shared/types";
 
 type Screen = "editor" | "teleprompter";
-type TimingMode = "automatic" | "manual";
 
 const screen = ref<Screen>("editor");
-const timingMode = ref<TimingMode>("automatic");
-const sourceMarkdown = ref("");
+const project = ref(loadLocalProject() ?? createProject());
+const sourceMarkdown = computed({
+  get: () => project.value.sourceMarkdown,
+  set: (markdown: string) => { project.value = updateProjectMarkdown(project.value, markdown); },
+});
+const timingMode = computed(() => project.value.timingMode);
 const cursor = ref(0);
 const document = computed(() => parseMarkdown(sourceMarkdown.value));
 const words = computed(() => document.value.tokens);
+const filePath = ref<string | null>(null);
+const notice = ref("");
+let noticeTimeout: number | undefined;
+
+watch(project, (value) => {
+  try {
+    saveLocalProject(value);
+  } catch {
+    showNotice("No se pudo guardar el borrador local.");
+  }
+}, { deep: true });
 
 function start(mode: TimingMode) {
-  timingMode.value = mode;
+  project.value = { ...project.value, timingMode: mode };
   cursor.value = 0;
   screen.value = "teleprompter";
 }
+
+function showNotice(message: string) {
+  notice.value = message;
+  if (noticeTimeout !== undefined) window.clearTimeout(noticeTimeout);
+  noticeTimeout = window.setTimeout(() => { notice.value = ""; }, 3500);
+}
+
+async function openProject() {
+  try {
+    const opened = await openProjectFile();
+    if (!opened) return;
+    project.value = opened.project;
+    filePath.value = opened.filePath;
+    cursor.value = 0;
+    showNotice(`Proyecto abierto: ${opened.project.title}`);
+  } catch (error) {
+    showNotice(error instanceof Error ? error.message : "No se pudo abrir el proyecto.");
+  }
+}
+
+async function saveProject() {
+  try {
+    const updated = { ...project.value, updatedAt: new Date().toISOString() };
+    const savedPath = await saveProjectFile(updated, filePath.value);
+    if (isTauri() && !savedPath) return;
+    project.value = updated;
+    filePath.value = savedPath ?? filePath.value;
+    showNotice("Proyecto guardado en este dispositivo.");
+  } catch (error) {
+    showNotice(error instanceof Error ? error.message : "No se pudo guardar el proyecto.");
+  }
+}
+
+function handlePrompterKey(event: KeyboardEvent) {
+  if (screen.value !== "teleprompter") return;
+  if (event.key === "ArrowRight") {
+    event.preventDefault();
+    advance();
+  } else if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    retreat();
+  } else if (event.key === "Escape") {
+    returnToEditor();
+  }
+}
+
+onMounted(() => window.addEventListener("keydown", handlePrompterKey));
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", handlePrompterKey);
+  if (noticeTimeout !== undefined) window.clearTimeout(noticeTimeout);
+});
 
 function returnToEditor() {
   screen.value = "editor";
@@ -70,6 +139,9 @@ function retreat() {
             Tu próximo guion empieza aquí
           </p>
           <h1>Escribe con claridad.<br><span>Lee con confianza.</span></h1>
+          <p class="document-title">
+            {{ project.title }}
+          </p>
         </div>
 
         <ScriptEditor v-model="sourceMarkdown" />
@@ -97,14 +169,14 @@ function retreat() {
             <button
               class="text-button"
               type="button"
-              disabled
+              @click="openProject"
             >
               Abrir proyecto
             </button>
             <button
               class="text-button"
               type="button"
-              disabled
+              @click="saveProject"
             >
               Guardar
             </button>
@@ -112,6 +184,13 @@ function retreat() {
         </div>
         <p class="editor-hint">
           Pega o escribe tu texto; tus palabras siempre se quedan contigo.
+        </p>
+        <p
+          class="notice"
+          role="status"
+          aria-live="polite"
+        >
+          {{ notice }}
         </p>
       </section>
       <footer class="app-footer">
@@ -162,6 +241,13 @@ function retreat() {
           Vuelve al editor y coloca tu texto.
         </p>
       </section>
+      <p
+        class="notice notice-dark"
+        role="status"
+        aria-live="polite"
+      >
+        {{ notice }}
+      </p>
       <footer class="prompter-controls">
         <button
           class="button button-secondary"
