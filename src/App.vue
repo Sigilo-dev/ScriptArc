@@ -6,7 +6,14 @@ import { parseMarkdown } from "./features/markdown/parseMarkdown";
 import { createProject, updateProjectMarkdown } from "./features/project/projectModel";
 import { loadLocalProject, openProjectFile, saveLocalProject, saveProjectFile } from "./features/project/projectPersistence";
 import { createAutomaticReadingWords } from "./features/teleprompter/automaticTiming";
-import { manualWordDuration, upsertManualWordTiming } from "./features/teleprompter/manualTiming";
+import {
+  advanceManualRecording,
+  createManualRecordingSession,
+  finishManualRecording,
+  manualWordDuration,
+  retreatManualRecording,
+  startManualRecording,
+} from "./features/teleprompter/manualTiming";
 import SettingsPanel from "./features/settings/SettingsPanel.vue";
 import type { ReadingWord, TimingMode } from "./shared/types";
 
@@ -16,11 +23,17 @@ const screen = ref<Screen>("editor");
 const project = ref(loadLocalProject() ?? createProject());
 const sourceMarkdown = computed({
   get: () => project.value.sourceMarkdown,
-  set: (markdown: string) => { project.value = updateProjectMarkdown(project.value, markdown); },
+  set: (markdown: string) => {
+    const hadTimings = project.value.manualTimings.length > 0;
+    const sourceChanged = markdown !== project.value.sourceMarkdown;
+    project.value = updateProjectMarkdown(project.value, markdown);
+    if (sourceChanged && hadTimings) showNotice("El texto cambió; los tiempos manuales se eliminaron para evitar asignarlos a otras palabras.");
+  },
 });
 const timingMode = computed(() => project.value.timingMode);
 const cursor = ref(0);
-const isRecording = ref(false);
+const manualSession = ref(createManualRecordingSession(0));
+const isRecording = computed(() => manualSession.value.status === "recording");
 const document = computed(() => parseMarkdown(sourceMarkdown.value));
 const words = computed<ReadingWord[]>(() => timingMode.value === "automatic"
   ? createAutomaticReadingWords(document.value, project.value.automaticTiming, project.value.preferences.wordsPerMinute)
@@ -32,7 +45,6 @@ const settingsOpen = ref(false);
 const wordElements = new Map<number, HTMLElement>();
 let noticeTimeout: number | undefined;
 let playbackTimer: number | undefined;
-let lastManualTimestamp = 0;
 
 watch(project, (value) => {
   try {
@@ -47,6 +59,7 @@ function start(mode: TimingMode) {
   stopRecording();
   stopPlayback();
   project.value = { ...project.value, timingMode: mode };
+  manualSession.value = createManualRecordingSession(mode === "manual" ? document.value.tokens.length : 0, project.value.manualTimings);
   cursor.value = 0;
   screen.value = "teleprompter";
 }
@@ -64,6 +77,7 @@ async function openProject() {
     stopRecording();
     stopPlayback();
     project.value = opened.project;
+    manualSession.value = createManualRecordingSession(parseMarkdown(opened.project.sourceMarkdown).tokens.length, opened.project.manualTimings);
     settingsOpen.value = false;
     filePath.value = opened.filePath;
     cursor.value = 0;
@@ -118,11 +132,18 @@ function advance() {
     recordCurrentWord();
     return;
   }
+  if (timingMode.value === "manual" && manualSession.value.status === "ready") return;
   stopPlayback();
   cursor.value = Math.min(cursor.value + 1, words.value.length);
 }
 
 function retreat() {
+  if (isRecording.value) {
+    manualSession.value = retreatManualRecording(manualSession.value, performance.now());
+    project.value = { ...project.value, manualTimings: manualSession.value.timings };
+    cursor.value = manualSession.value.cursor;
+    return;
+  }
   stopRecording();
   stopPlayback();
   cursor.value = Math.max(0, cursor.value - 1);
@@ -130,41 +151,36 @@ function retreat() {
 
 function toggleRecording() {
   if (isRecording.value) {
-    stopRecording();
+    stopRecording(true);
     return;
   }
   if (!words.value.length) return;
   stopPlayback();
-  if (cursor.value >= words.value.length) cursor.value = 0;
-  const retainedTimings = project.value.manualTimings.filter((timing) => timing.tokenIndex < cursor.value);
-  project.value = { ...project.value, timingMode: "manual", manualTimings: retainedTimings };
-  lastManualTimestamp = performance.now();
-  isRecording.value = true;
+  manualSession.value = startManualRecording(createManualRecordingSession(words.value.length), performance.now());
+  project.value = { ...project.value, timingMode: "manual", manualTimings: [] };
+  cursor.value = manualSession.value.cursor;
   showNotice("Grabando. Lee la palabra resaltada y pulsa → al terminar.");
 }
 
 function recordCurrentWord() {
-  const word = words.value[cursor.value];
-  if (!word || !isRecording.value) {
+  if (!isRecording.value) {
     stopRecording();
     return;
   }
-  const now = performance.now();
-  const updatedTimings = upsertManualWordTiming(project.value.manualTimings, word.sourceTokenIndex, now - lastManualTimestamp);
-  project.value = {
-    ...project.value,
-    manualTimings: updatedTimings,
-  };
-  cursor.value += 1;
-  lastManualTimestamp = now;
-  if (cursor.value >= words.value.length) {
-    stopRecording();
-    showNotice("Ritmo manual grabado. Puedes reproducirlo o volver a grabar.");
-  }
+  manualSession.value = advanceManualRecording(manualSession.value, performance.now());
+  project.value = { ...project.value, manualTimings: manualSession.value.timings };
+  cursor.value = manualSession.value.cursor;
+  if (manualSession.value.status === "review") showNotice("Ritmo manual grabado. Puedes revisar, reproducir o volver a grabar.");
 }
 
-function stopRecording() {
-  isRecording.value = false;
+function stopRecording(captureCurrentWord = false) {
+  if (!isRecording.value) return;
+  manualSession.value = captureCurrentWord
+    ? finishManualRecording(manualSession.value, performance.now())
+    : { ...manualSession.value, status: "review", lastAdvanceAt: null };
+  project.value = { ...project.value, manualTimings: manualSession.value.timings };
+  cursor.value = manualSession.value.cursor;
+  if (captureCurrentWord) showNotice("Grabación detenida. Puedes revisar, editar o reproducir el ritmo registrado.");
 }
 
 function togglePlayback() {
@@ -392,7 +408,7 @@ watch([screen, cursor], () => {
         v-if="timingMode === 'manual'"
         class="manual-instruction"
       >
-        {{ isRecording ? "Lee la palabra blanca y pulsa → cuando termines; cada toque registra su duración." : "Pulsa Grabar, lee la palabra blanca y avanza con → al terminar cada palabra." }}
+        {{ isRecording ? "Lee la palabra blanca y pulsa → al terminarla; ← vuelve una palabra y permite repetirla." : manualSession.status === "review" ? "Grabación lista para revisar. Puedes reproducirla o pulsar RECORD para empezar de nuevo." : "Pulsa RECORD y lee la palabra blanca; avanza con → al terminar cada palabra." }}
       </p>
       <p
         class="notice notice-dark"
@@ -418,9 +434,10 @@ watch([screen, cursor], () => {
           :disabled="!words.length"
           @click="toggleRecording"
         >
-          {{ isRecording ? "Detener" : "Grabar" }}
+          {{ isRecording ? "■ DETENER" : manualSession.status === "review" ? "● REGRABAR" : "● RECORD" }}
         </button>
         <button
+          v-if="timingMode === 'automatic' || project.manualTimings.length > 0"
           class="button button-secondary playback-button"
           type="button"
           :disabled="!words.length || (timingMode === 'manual' && (!project.manualTimings.length || isRecording))"
