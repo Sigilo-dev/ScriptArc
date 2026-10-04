@@ -1,0 +1,60 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release-windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - name: install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: verify release version
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: pnpm check:version $env:RELEASE_TAG
+      - name: lint
+        run: pnpm lint
+      - name: typecheck
+        run: pnpm typecheck
+      - name: tests
+        run: pnpm test
+      - name: build setup installer and create release
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: ScriptArc ${{ github.ref_name }}
+          releaseBody: "Download the Windows portable ZIP or the standard setup installer from the assets below."
+          generateReleaseNotes: true
+          releaseAssetNamePattern: ScriptArc-v[version]-windows-x64[setup].[ext]
+          args: --bundles nsis
+      - name: package portable zip
+        id: portable
+        shell: pwsh
+        run: ./scripts/build-portable.ps1 -SkipBuild -OutputDirectory $env:RUNNER_TEMP
+      - name: upload portable zip to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ScriptArc ${{ github.ref_name }}
+          files: ${{ steps.portable.outputs.path }}
+          fail_on_unmatched_files: true

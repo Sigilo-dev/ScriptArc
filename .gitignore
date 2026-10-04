@@ -12,6 +12,16 @@ dist
 dist-ssr
 *.local
 scriptarc-scaffold/
+src-tauri/target/
+dist-release/
+portable-staging/
+*.scriptarc.tmp
+*.msi
+*.exe
+*.zip
+.env
+.env.*
+!.env.example
 
 # Editor directories and files
 .vscode/*
