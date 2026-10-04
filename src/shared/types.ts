@@ -66,5 +66,4 @@ export interface ParsedMarkdownDocument {
 export interface ReadingWord extends MarkdownToken {
   sourceTokenIndex: number;
   durationMilliseconds: number;
-  isNumberExpansion: boolean;
 }

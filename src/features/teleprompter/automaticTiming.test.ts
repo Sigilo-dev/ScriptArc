@@ -7,6 +7,7 @@ import { numberToWords, pronounceNumericToken } from "./numberToWords";
 describe("numberToWords", () => {
   it("converts integers in Spanish and English", () => {
     expect(numberToWords(200, "es")).toBe("doscientos");
+    expect(numberToWords(200, "en")).toBe("two hundred");
     expect(numberToWords(24_807, "es")).toBe("veinticuatro mil ochocientos siete");
     expect(numberToWords(2_500, "en")).toBe("two thousand five hundred");
     expect(numberToWords(21, "en")).toBe("twenty-one");
@@ -20,11 +21,13 @@ describe("numberToWords", () => {
 });
 
 describe("automatic reading words", () => {
-  it("expands a number for speech without changing canonical Markdown", () => {
+  it("keeps a number as one visible word and bases its timing on spoken words", () => {
     const source = "El total es 2.500.";
     const document = parseMarkdown(source);
     const words = createAutomaticReadingWords(document, { ...defaultAutomaticTiming, language: "es" });
-    expect(words.map(({ visibleText }) => visibleText)).toEqual(["El", "total", "es", "dos", "mil", "quinientos."]);
+    expect(words.map(({ displayText }) => displayText)).toEqual(["El", "total", "es", "2.500."]);
+    expect(words[3].spokenText).toBe("dos mil quinientos.");
+    expect(words[3].durationMilliseconds).toBeGreaterThan(words[3].displayText.length * defaultAutomaticTiming.baseMillisecondsPerCharacter);
     expect(document.sourceMarkdown).toBe(source);
     expect(words[words.length - 1].punctuation).toBe("sentence");
   });
@@ -32,9 +35,9 @@ describe("automatic reading words", () => {
   it("adds natural pauses for commas, semicolons, sentences, and line endings", () => {
     const document = parseMarkdown("Hola, mundo; bien.\nSigue");
     const words = createAutomaticReadingWords(document, { ...defaultAutomaticTiming, paragraphPauseMilliseconds: 100 });
-    expect(words[0].durationMilliseconds).toBe(5 * 78 + 180);
-    expect(words[1].durationMilliseconds).toBe(6 * 78 + 273);
-    expect(words[2].durationMilliseconds).toBe(5 * 78 + 420 + 100);
+    expect(words[0].durationMilliseconds).toBe(4 * 78 + 180);
+    expect(words[1].durationMilliseconds).toBe(5 * 78 + 273);
+    expect(words[2].durationMilliseconds).toBe(4 * 78 + 420 + 100);
     expect(words[3].durationMilliseconds).toBe(5 * 78 + 100);
   });
 

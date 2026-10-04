@@ -13,6 +13,7 @@ Este archivo recoge decisiones y correcciones que deben mantenerse durante el de
 - Los proyectos `.scriptarc` conservan texto y configuración como JSON versionado; se guarda un borrador local y los archivos elegidos por el usuario usan los diálogos Tauri.
 - La grabación manual guarda un intervalo por token pronunciable. Cambiar el Markdown invalida esos tiempos para que no se asignen a palabras distintas; la puntuación sigue unida a su última palabra.
 - El parser de Markdown conserva los encabezados y los estilos inline como metadata por palabra; el signo de puntuación unido o separado por un espacio nunca crea un paso independiente.
+- La conversión cardinal usa `n2words` con importaciones regionales `es` y `en`; su licencia MIT, módulos pequeños y cero dependencias permiten cubrir ambos idiomas sin mantener gramática numérica propia. Un adaptador local reconoce agrupadores y conserva la puntuación del token.
 - Las preferencias del tema, idioma, ritmo y tamaño pertenecen al proyecto y se guardan localmente. Los seis temas usan las mismas variables CSS; blanco es el valor inicial.
 - Mantener organización pequeña por feature; evitar capas ceremoniales y dependencias que no resuelvan una necesidad del producto.
 

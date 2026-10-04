@@ -24,7 +24,7 @@ const isRecording = ref(false);
 const document = computed(() => parseMarkdown(sourceMarkdown.value));
 const words = computed<ReadingWord[]>(() => timingMode.value === "automatic"
   ? createAutomaticReadingWords(document.value, project.value.automaticTiming, project.value.preferences.wordsPerMinute)
-  : document.value.tokens.map((token) => ({ ...token, sourceTokenIndex: token.index, durationMilliseconds: 0, isNumberExpansion: false })));
+  : document.value.tokens.map((token) => ({ ...token, sourceTokenIndex: token.index, durationMilliseconds: 0 })));
 const isPlaying = ref(false);
 const filePath = ref<string | null>(null);
 const notice = ref("");
@@ -203,7 +203,7 @@ function scheduleNextWord() {
 function playbackDuration(word: ReadingWord): number {
   if (timingMode.value === "automatic") return word.durationMilliseconds;
   const speedScale = 160 / project.value.preferences.wordsPerMinute;
-  const fallback = Math.max(250, Math.round(word.visibleText.length * project.value.automaticTiming.baseMillisecondsPerCharacter * speedScale));
+  const fallback = Math.max(250, Math.round(word.spokenText.replace(/[.,;:!?…)}\]”’"'»}]+$/u, "").length * project.value.automaticTiming.baseMillisecondsPerCharacter * speedScale));
   return manualWordDuration(project.value.manualTimings, word.sourceTokenIndex, fallback);
 }
 
