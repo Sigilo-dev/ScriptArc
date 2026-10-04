@@ -13,7 +13,7 @@ export const AUTOMATIC_TIMING_LIMITS = {
 export function createAutomaticReadingWords(
   document: ParsedMarkdownDocument,
   settings: AutomaticTimingSettings,
-  wordsPerMinute: number = AUTOMATIC_TIMING_LIMITS.referenceWordsPerMinute,
+  wordsPerMinute: number = settings.wordsPerMinute,
 ): ReadingWord[] {
   const finalTokens = new Set(document.blocks.map((block) => block.tokenEnd - 1));
 

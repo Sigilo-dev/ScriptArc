@@ -145,8 +145,17 @@ function parseInline(source: string, sourceOffset: number, inherited: EmphasisSt
     if (imageOrLink) {
       const label = imageOrLink[1] ?? imageOrLink[2] ?? "";
       const labelOffset = imageOrLink[0].indexOf(label);
-      append(label, sourceOffset + cursor + labelOffset);
+      for (const run of parseInline(label, sourceOffset + cursor + labelOffset, inherited)) {
+        append(run.text, run.sourceStart, run.emphasisStyles);
+      }
       cursor += imageOrLink[0].length;
+      continue;
+    }
+
+    // Raw HTML is deliberately treated as non-content. The renderer also uses text nodes only.
+    const rawHtmlTag = /^<\/?[A-Za-z][^>]*>/u.exec(remainder);
+    if (rawHtmlTag) {
+      cursor += rawHtmlTag[0].length;
       continue;
     }
 
@@ -160,7 +169,15 @@ function parseInline(source: string, sourceOffset: number, inherited: EmphasisSt
 
     const marker = /^(\*\*|__|~~|\*|_)/u.exec(remainder)?.[0];
     if (marker) {
-      const closing = source.indexOf(marker, cursor + marker.length);
+      let closing = source.indexOf(marker, cursor + marker.length);
+      let closingLength = marker.length;
+      if (marker === "**" || marker === "__") {
+        const nestedTriple = source.indexOf(marker[0].repeat(3), cursor + marker.length);
+        if (nestedTriple >= 0 && (closing < 0 || nestedTriple <= closing)) {
+          closing = nestedTriple + 1;
+          closingLength = 2;
+        }
+      }
       if (closing > cursor + marker.length) {
         const style: EmphasisStyle = marker === "~~" ? "strikethrough" : marker.length === 2 ? "strong" : "emphasis";
         const innerStart = cursor + marker.length;
@@ -168,7 +185,7 @@ function parseInline(source: string, sourceOffset: number, inherited: EmphasisSt
         for (const run of parseInline(inner, sourceOffset + innerStart, [...inherited, style])) {
           append(run.text, run.sourceStart, run.emphasisStyles);
         }
-        cursor = closing + marker.length;
+        cursor = closing + closingLength;
         continue;
       }
     }

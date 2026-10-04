@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, watch } from "vue";
+import { nextTick, onMounted, watch } from "vue";
 import type { MarkdownBlock, ReadingWord } from "../../shared/types";
 
 const props = defineProps<{
@@ -9,6 +9,7 @@ const props = defineProps<{
 }>();
 
 const wordElements = new Map<number, HTMLElement>();
+let lastAppliedCursor = -1;
 
 function indexes(block: MarkdownBlock): number[] {
   return Array.from({ length: Math.max(0, block.tokenEnd - block.tokenStart) }, (_, offset) => block.tokenStart + offset);
@@ -24,9 +25,29 @@ function setWordElement(element: unknown, index: number) {
   else wordElements.delete(index);
 }
 
-watch(() => [props.cursor, props.words.length], () => {
-  void nextTick(() => wordElements.get(props.cursor)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+function syncCursor(resetAll = false) {
+  const start = resetAll || lastAppliedCursor < 0 ? 0 : Math.min(lastAppliedCursor, props.cursor);
+  const end = resetAll || lastAppliedCursor < 0
+    ? props.words.length - 1
+    : Math.max(lastAppliedCursor, props.cursor);
+  for (let index = start; index <= end; index += 1) {
+    const element = wordElements.get(index);
+    if (!element) continue;
+    element.classList.toggle("word-current", index === props.cursor);
+    element.classList.toggle("word-spoken", index < props.cursor);
+    if (index === props.cursor) element.setAttribute("aria-current", "step");
+    else element.removeAttribute("aria-current");
+  }
+  lastAppliedCursor = props.cursor;
+  const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+  void nextTick(() => wordElements.get(props.cursor)?.scrollIntoView({ behavior, block: "center" }));
+}
+
+watch(() => props.cursor, () => syncCursor(), { flush: "post" });
+watch(() => props.words, () => {
+  void nextTick(() => syncCursor(true));
 }, { flush: "post" });
+onMounted(() => syncCursor(true));
 </script>
 
 <template>
@@ -36,8 +57,8 @@ watch(() => [props.cursor, props.words.length], () => {
   >
     <div
       v-if="words.length"
+      v-memo="[words]"
       class="prompter-text"
-      aria-live="polite"
     >
       <component
         :is="blockTag(block)"
@@ -53,10 +74,7 @@ watch(() => [props.cursor, props.words.length], () => {
           <span
             v-if="words[wordIndex]"
             :ref="(element) => setWordElement(element, wordIndex)"
-            :class="[
-              { 'word-current': wordIndex === cursor, 'word-spoken': wordIndex < cursor },
-              ...words[wordIndex].emphasisStyles.map((style) => `word-${style}`),
-            ]"
+            :class="words[wordIndex].emphasisStyles.map((style) => `word-${style}`)"
           >{{ words[wordIndex].displayText }}</span>{{ wordIndex < block.tokenEnd - 1 ? ' ' : '' }}
         </template>
       </component>

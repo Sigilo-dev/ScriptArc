@@ -40,4 +40,18 @@ describe("parseMarkdown", () => {
     expect(document.blocks.map(({ kind }) => kind)).toEqual(["list-item", "list-item"]);
     expect(document.spokenText).toBe("Lee este guion. Sigue el paso");
   });
+
+  it("parses nested formatting inside links and never exposes raw HTML tags", () => {
+    const document = parseMarkdown("[**OpenAI**](https://openai.com) <script>alert(1)</script>");
+    expect(document.tokens.map(({ displayText }) => displayText)).toEqual(["OpenAI", "alert(1)"]);
+    expect(document.tokens[0].emphasisStyles).toContain("strong");
+    expect(document.visibleText).not.toContain("script");
+  });
+
+  it("keeps reasonable nested emphasis on individual words", () => {
+    const document = parseMarkdown("**important *very important* text**");
+    expect(document.tokens.map(({ displayText }) => displayText)).toEqual(["important", "very", "important", "text"]);
+    expect(document.tokens[0].emphasisStyles).toEqual(["strong"]);
+    expect(document.tokens[1].emphasisStyles).toEqual(["strong", "emphasis"]);
+  });
 });
