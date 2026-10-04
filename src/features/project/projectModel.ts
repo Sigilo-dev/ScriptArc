@@ -2,28 +2,36 @@ import type {
   Language,
   ManualWordTiming,
   ScriptProject,
-  ThemeId,
   TimingMode,
+  UserPreferences,
 } from "../../shared/types";
+import { parseMarkdown } from "../markdown/parseMarkdown";
 
-export const CURRENT_PROJECT_FORMAT = 1 as const;
+export const CURRENT_PROJECT_FORMAT = 2 as const;
 
-export const defaultProjectPreferences = {
+export const defaultUserPreferences: UserPreferences = {
   theme: "white",
-  fontSize: 56,
-  lineHeight: 1.35,
-  wordsPerMinute: 160,
+  defaultFontSize: 56,
+  defaultWordsPerMinute: 160,
+  defaultLanguage: "es",
+  countdownSeconds: 5,
+  hideControlsAutomatically: true,
 } as const;
 
 export const defaultAutomaticTiming = {
   language: "es",
+  wordsPerMinute: 160,
   baseMillisecondsPerCharacter: 78,
   commaPauseMilliseconds: 180,
   sentencePauseMilliseconds: 420,
   paragraphPauseMilliseconds: 650,
 } as const;
 
-export function createProject(sourceMarkdown = "", now = new Date()): ScriptProject {
+export function createProject(
+  sourceMarkdown = "",
+  now = new Date(),
+  defaults: Pick<UserPreferences, "defaultFontSize" | "defaultWordsPerMinute" | "defaultLanguage"> = defaultUserPreferences,
+): ScriptProject {
   const timestamp = now.toISOString();
   return {
     formatVersion: CURRENT_PROJECT_FORMAT,
@@ -33,9 +41,14 @@ export function createProject(sourceMarkdown = "", now = new Date()): ScriptProj
     updatedAt: timestamp,
     sourceMarkdown,
     timingMode: "automatic",
-    automaticTiming: { ...defaultAutomaticTiming },
+    lastPosition: 0,
+    automaticTiming: {
+      ...defaultAutomaticTiming,
+      language: defaults.defaultLanguage,
+      wordsPerMinute: defaults.defaultWordsPerMinute,
+    },
     manualTimings: [],
-    preferences: { ...defaultProjectPreferences },
+    teleprompterSettings: { fontSize: defaults.defaultFontSize, lineHeight: 1.35 },
   };
 }
 
@@ -45,13 +58,13 @@ export function updateProjectMarkdown(project: ScriptProject, sourceMarkdown: st
     ...project,
     title: inferProjectTitle(sourceMarkdown),
     sourceMarkdown,
-    ...(sourceChanged ? { manualTimings: [] } : {}),
+    ...(sourceChanged ? { manualTimings: [], lastPosition: 0 } : {}),
     updatedAt: now.toISOString(),
   };
 }
 
 export function serializeProject(project: ScriptProject): string {
-  return JSON.stringify(project, null, 2);
+  return JSON.stringify(validateCurrentProject(project), null, 2);
 }
 
 export function deserializeProject(serialized: string): ScriptProject {
@@ -67,8 +80,12 @@ export function deserializeProject(serialized: string): ScriptProject {
 export function migrateProject(value: unknown): ScriptProject {
   if (!isRecord(value)) throw new Error("El proyecto debe ser un objeto JSON.");
   if (value.formatVersion === CURRENT_PROJECT_FORMAT) return validateCurrentProject(value);
+  if (value.formatVersion === 1) return migrateVersionOne(value);
   if (value.formatVersion === 0) return migrateVersionZero(value);
-  throw new Error(`Versión de proyecto no compatible: ${String(value.formatVersion)}.`);
+  if (typeof value.formatVersion === "number" && value.formatVersion > CURRENT_PROJECT_FORMAT) {
+    throw new Error(`Este proyecto fue creado con una versión futura incompatible (${value.formatVersion}). Actualiza ScriptArc para abrirlo.`);
+  }
+  throw new Error(`La versión del proyecto no está soportada: ${String(value.formatVersion)}.`);
 }
 
 function migrateVersionZero(value: Record<string, unknown>): ScriptProject {
@@ -79,33 +96,75 @@ function migrateVersionZero(value: Record<string, unknown>): ScriptProject {
   return { ...created, id: typeof value.id === "string" ? value.id : created.id, timingMode, automaticTiming: { ...created.automaticTiming, language } };
 }
 
-function validateCurrentProject(value: Record<string, unknown>): ScriptProject {
+function migrateVersionOne(value: Record<string, unknown>): ScriptProject {
+  if (typeof value.id !== "string" || typeof value.sourceMarkdown !== "string") {
+    throw new Error("El proyecto de versión 1 no contiene sus campos principales.");
+  }
+  const priorTiming = isRecord(value.automaticTiming) ? value.automaticTiming : {};
+  const priorPreferences = isRecord(value.preferences) ? value.preferences : {};
+  const defaults = {
+    defaultFontSize: finiteOr(priorPreferences.fontSize, defaultUserPreferences.defaultFontSize),
+    defaultWordsPerMinute: finiteOr(priorPreferences.wordsPerMinute, defaultUserPreferences.defaultWordsPerMinute),
+    defaultLanguage: priorTiming.language === "en" ? "en" as const : "es" as const,
+  };
+  const migrated = createProject(value.sourceMarkdown, new Date(), defaults);
+  return validateCurrentProject({
+    ...migrated,
+    id: value.id,
+    title: typeof value.title === "string" ? value.title : migrated.title,
+    createdAt: typeof value.createdAt === "string" ? value.createdAt : migrated.createdAt,
+    updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : migrated.updatedAt,
+    timingMode: value.timingMode,
+    lastPosition: 0,
+    automaticTiming: { ...migrated.automaticTiming, ...priorTiming, language: defaults.defaultLanguage, wordsPerMinute: defaults.defaultWordsPerMinute },
+    manualTimings: value.manualTimings,
+    teleprompterSettings: { fontSize: defaults.defaultFontSize, lineHeight: finiteOr(priorPreferences.lineHeight, 1.35) },
+  });
+}
+
+function validateCurrentProject(input: unknown): ScriptProject {
+  if (!isRecord(input)) throw new Error("El proyecto debe ser un objeto JSON.");
+  const value = input;
   if (typeof value.id !== "string" || typeof value.title !== "string" || typeof value.sourceMarkdown !== "string") {
     throw new Error("El proyecto no contiene sus campos principales.");
   }
   if (typeof value.createdAt !== "string" || typeof value.updatedAt !== "string") {
     throw new Error("El proyecto tiene fechas no válidas.");
   }
-  if (!isTimingMode(value.timingMode) || !isRecord(value.automaticTiming) || !isRecord(value.preferences)) {
+  if (Number.isNaN(Date.parse(value.createdAt)) || Number.isNaN(Date.parse(value.updatedAt))) {
+    throw new Error("El proyecto contiene fechas mal formadas.");
+  }
+  if (!isTimingMode(value.timingMode) || !isRecord(value.automaticTiming) || !isRecord(value.teleprompterSettings)) {
     throw new Error("La configuración del proyecto no es válida.");
   }
   if (!Array.isArray(value.manualTimings) || !value.manualTimings.every(isManualTiming)) {
     throw new Error("Los tiempos manuales del proyecto no son válidos.");
   }
+  const manualIndices = value.manualTimings.map((timing) => timing.tokenIndex);
+  if (new Set(manualIndices).size !== manualIndices.length || manualIndices.some((index) => index < 0 || index > 500_000)) {
+    throw new Error("Los tiempos manuales tienen índices duplicados o fuera de rango.");
+  }
+  const tokenCount = parseMarkdown(value.sourceMarkdown).tokens.length;
+  if (!Number.isInteger(value.lastPosition) || (value.lastPosition as number) < 0 || (value.lastPosition as number) > tokenCount) {
+    throw new Error("La posición guardada no coincide con las palabras del guion.");
+  }
+  if (manualIndices.some((index) => index >= tokenCount)) {
+    throw new Error("Los tiempos manuales no coinciden con las palabras del guion.");
+  }
 
   const automaticTiming = value.automaticTiming;
-  const preferences = value.preferences;
-  if (!isLanguage(automaticTiming.language) || !isThemeId(preferences.theme)) {
-    throw new Error("El idioma o el tema del proyecto no son válidos.");
+  const teleprompterSettings = value.teleprompterSettings;
+  if (!isLanguage(automaticTiming.language)) {
+    throw new Error("El idioma automático del proyecto no es válido.");
   }
+  const wordsPerMinute = readFiniteNumber(automaticTiming.wordsPerMinute);
   const baseMillisecondsPerCharacter = readFiniteNumber(automaticTiming.baseMillisecondsPerCharacter);
   const commaPauseMilliseconds = readFiniteNumber(automaticTiming.commaPauseMilliseconds);
   const sentencePauseMilliseconds = readFiniteNumber(automaticTiming.sentencePauseMilliseconds);
   const paragraphPauseMilliseconds = readFiniteNumber(automaticTiming.paragraphPauseMilliseconds);
-  const fontSize = readFiniteNumber(preferences.fontSize);
-  const lineHeight = readFiniteNumber(preferences.lineHeight);
-  const wordsPerMinute = readFiniteNumber(preferences.wordsPerMinute);
-  if (baseMillisecondsPerCharacter <= 0 || fontSize <= 0 || lineHeight < 1 || wordsPerMinute <= 0) {
+  const fontSize = readFiniteNumber(teleprompterSettings.fontSize);
+  const lineHeight = readFiniteNumber(teleprompterSettings.lineHeight);
+  if (baseMillisecondsPerCharacter <= 0 || commaPauseMilliseconds < 0 || sentencePauseMilliseconds < 0 || paragraphPauseMilliseconds < 0 || fontSize < 30 || fontSize > 120 || lineHeight < 1 || wordsPerMinute < 40 || wordsPerMinute > 400) {
     throw new Error("Los valores de ritmo y presentación deben ser positivos.");
   }
 
@@ -117,21 +176,25 @@ function validateCurrentProject(value: Record<string, unknown>): ScriptProject {
     updatedAt: value.updatedAt,
     sourceMarkdown: value.sourceMarkdown,
     timingMode: value.timingMode,
+    lastPosition: value.lastPosition as number,
     automaticTiming: {
       language: automaticTiming.language,
+      wordsPerMinute,
       baseMillisecondsPerCharacter,
       commaPauseMilliseconds,
       sentencePauseMilliseconds,
       paragraphPauseMilliseconds,
     },
-    manualTimings: value.manualTimings.filter(isManualTiming),
-    preferences: {
-      theme: preferences.theme,
+    manualTimings: [...value.manualTimings].sort((a, b) => a.tokenIndex - b.tokenIndex),
+    teleprompterSettings: {
       fontSize,
       lineHeight,
-      wordsPerMinute,
     },
   };
+}
+
+function finiteOr(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 function inferProjectTitle(sourceMarkdown: string): string {
@@ -164,11 +227,8 @@ function isTimingMode(value: unknown): value is TimingMode {
   return value === "automatic" || value === "manual";
 }
 
-function isThemeId(value: unknown): value is ThemeId {
-  return value === "white" || value === "gray" || value === "orange" || value === "blue" || value === "pink" || value === "black";
-}
-
 function isManualTiming(value: unknown): value is ManualWordTiming {
   if (!isRecord(value)) return false;
-  return Number.isInteger(value.tokenIndex) && isFiniteNumber(value.durationMilliseconds) && value.durationMilliseconds > 0;
+  return Number.isInteger(value.tokenIndex) && Number.isInteger(value.durationMilliseconds)
+    && isFiniteNumber(value.durationMilliseconds) && value.durationMilliseconds >= 250 && value.durationMilliseconds <= 6000;
 }

@@ -4,6 +4,7 @@ export type ThemeId = "white" | "gray" | "orange" | "blue" | "pink" | "black";
 
 export interface AutomaticTimingSettings {
   language: Language;
+  wordsPerMinute: number;
   baseMillisecondsPerCharacter: number;
   commaPauseMilliseconds: number;
   sentencePauseMilliseconds: number;
@@ -16,23 +17,31 @@ export interface ManualWordTiming {
 }
 
 export interface TeleprompterPreferences {
-  theme: ThemeId;
   fontSize: number;
   lineHeight: number;
-  wordsPerMinute: number;
+}
+
+export interface UserPreferences {
+  theme: ThemeId;
+  defaultFontSize: number;
+  defaultWordsPerMinute: number;
+  defaultLanguage: Language;
+  countdownSeconds: number;
+  hideControlsAutomatically: boolean;
 }
 
 export interface ScriptProject {
-  formatVersion: 1;
+  formatVersion: 2;
   id: string;
   title: string;
   createdAt: string;
   updatedAt: string;
   sourceMarkdown: string;
   timingMode: TimingMode;
+  lastPosition: number;
   automaticTiming: AutomaticTimingSettings;
   manualTimings: ManualWordTiming[];
-  preferences: TeleprompterPreferences;
+  teleprompterSettings: TeleprompterPreferences;
 }
 
 export interface MarkdownToken {

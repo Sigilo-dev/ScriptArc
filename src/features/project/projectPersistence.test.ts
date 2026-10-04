@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createProject } from "./projectModel";
-import { LOCAL_PROJECT_KEY, loadLocalProject, saveLocalProject } from "./projectPersistence";
+import { clearRecoveryDraft, loadRecoveryDraft, projectFingerprint, RECOVERY_DRAFT_KEY, saveRecoveryDraft } from "./projectPersistence";
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();
@@ -18,19 +18,26 @@ class MemoryStorage {
   }
 }
 
-describe("local project storage", () => {
-  it("stores and restores a versioned script project", () => {
+describe("local project recovery", () => {
+  it("restores a recovery snapshot without confusing its source file with the unsaved contents", () => {
     const storage = new MemoryStorage();
-    const project = createProject("## Local\nTexto.");
-    saveLocalProject(project, storage);
-    expect(storage.getItem(LOCAL_PROJECT_KEY)).toContain('"formatVersion": 1');
-    expect(loadLocalProject(storage)?.sourceMarkdown).toBe(project.sourceMarkdown);
+    const project = createProject("Recover me");
+    saveRecoveryDraft(project, "E:\\talk.scriptarc", "saved-version", storage);
+    expect(loadRecoveryDraft(storage)).toEqual({ project, filePath: "E:\\talk.scriptarc", baselineFingerprint: "saved-version" });
+    clearRecoveryDraft(storage);
+    expect(storage.getItem(RECOVERY_DRAFT_KEY)).toBeNull();
   });
 
-  it("discards a corrupted draft and returns an empty state", () => {
+  it("fingerprints project content without treating save timestamps as edits", () => {
+    const project = createProject("Hello");
+    expect(projectFingerprint({ ...project, updatedAt: "later" })).toBe(projectFingerprint(project));
+    expect(projectFingerprint({ ...project, sourceMarkdown: "Changed" })).not.toBe(projectFingerprint(project));
+  });
+
+  it("discards corrupt recovery data instead of opening it", () => {
     const storage = new MemoryStorage();
-    storage.setItem(LOCAL_PROJECT_KEY, "corrupted data");
-    expect(loadLocalProject(storage)).toBeNull();
-    expect(storage.getItem(LOCAL_PROJECT_KEY)).toBeNull();
+    storage.setItem(RECOVERY_DRAFT_KEY, JSON.stringify({ formatVersion: 1, project: { formatVersion: 99 } }));
+    expect(loadRecoveryDraft(storage)).toBeNull();
+    expect(storage.getItem(RECOVERY_DRAFT_KEY)).toBeNull();
   });
 });

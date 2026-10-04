@@ -8,6 +8,8 @@ defineProps<{
   language: Language;
   wordsPerMinute: number;
   fontSize: number;
+  countdownSeconds: number;
+  hideControlsAutomatically: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -16,6 +18,8 @@ const emit = defineEmits<{
   "update:language": [value: Language];
   "update:wordsPerMinute": [value: number];
   "update:fontSize": [value: number];
+  "update:countdownSeconds": [value: number];
+  "update:hideControlsAutomatically": [value: boolean];
 }>();
 </script>
 
@@ -66,7 +70,7 @@ const emit = defineEmits<{
     </div>
 
     <label class="settings-field">
-      <span>Idioma automático</span>
+      <span>Idioma automático predeterminado</span>
       <select
         :value="language"
         @change="emit('update:language', ($event.target as HTMLSelectElement).value as Language)"
@@ -77,7 +81,7 @@ const emit = defineEmits<{
     </label>
 
     <label class="settings-range">
-      <span><span>Ritmo de lectura</span><output>{{ wordsPerMinute }} palabras/min</output></span>
+      <span><span>Ritmo automático predeterminado</span><output>{{ wordsPerMinute }} palabras/min</output></span>
       <input
         type="range"
         :min="AUTOMATIC_TIMING_LIMITS.minimumWordsPerMinute"
@@ -88,8 +92,30 @@ const emit = defineEmits<{
       >
     </label>
 
+    <label class="settings-field">
+      <span>Cuenta regresiva</span>
+      <select
+        :value="countdownSeconds"
+        @change="emit('update:countdownSeconds', Number(($event.target as HTMLSelectElement).value))"
+      >
+        <option :value="0">Sin cuenta regresiva</option>
+        <option :value="3">3 segundos</option>
+        <option :value="5">5 segundos</option>
+        <option :value="10">10 segundos</option>
+      </select>
+    </label>
+
+    <label class="settings-toggle">
+      <input
+        type="checkbox"
+        :checked="hideControlsAutomatically"
+        @change="emit('update:hideControlsAutomatically', ($event.target as HTMLInputElement).checked)"
+      >
+      <span>Ocultar controles al dejar de mover el cursor</span>
+    </label>
+
     <label class="settings-range">
-      <span><span>Tamaño de letra</span><output>{{ fontSize }} px</output></span>
+      <span><span>Tamaño de letra predeterminado</span><output>{{ fontSize }} px</output></span>
       <input
         type="range"
         min="30"

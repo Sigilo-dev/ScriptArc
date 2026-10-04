@@ -4,11 +4,17 @@ import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import type { ScriptProject } from "../../shared/types";
 import { deserializeProject, serializeProject } from "./projectModel";
 
-export const LOCAL_PROJECT_KEY = "scriptarc.local-project.v1";
+export const RECOVERY_DRAFT_KEY = "scriptarc.recovery.v1";
 
 export interface OpenedProject {
   project: ScriptProject;
   filePath: string | null;
+}
+
+export interface RecoveryDraft {
+  project: ScriptProject;
+  filePath: string | null;
+  baselineFingerprint: string;
 }
 
 type ProjectStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -28,35 +34,64 @@ export async function openProjectFile(): Promise<OpenedProject | null> {
   return { project: deserializeProject(await file.text()), filePath: null };
 }
 
-export async function saveProjectFile(project: ScriptProject, currentFilePath: string | null): Promise<string | null> {
+export async function saveProjectFile(project: ScriptProject, currentFilePath: string | null, saveAs = false): Promise<string | null> {
   const content = serializeProject(project);
   if (isTauri()) {
-    const selected = currentFilePath ?? await save({
-      defaultPath: `${safeFileName(project.title)}.scriptarc`,
+    const selected = (!saveAs ? currentFilePath : null) ?? await save({
+      defaultPath: saveAs && currentFilePath ? currentFilePath : `${safeFileName(project.title)}.scriptarc`,
       filters: [{ name: "ScriptArc", extensions: ["scriptarc"] }],
     });
     if (!selected) return null;
-    await writeTextFile(selected, content);
-    return selected;
+    const projectPath = selected.toLowerCase().endsWith(".scriptarc") ? selected : `${selected}.scriptarc`;
+    await writeTextFile(projectPath, content);
+    return projectPath;
   }
 
   downloadBrowserFile(content, `${safeFileName(project.title)}.scriptarc`);
   return null;
 }
 
-export function loadLocalProject(storage: ProjectStorage = window.localStorage): ScriptProject | null {
-  const serialized = storage.getItem(LOCAL_PROJECT_KEY);
+export function projectFingerprint(project: ScriptProject): string {
+  return JSON.stringify(Object.fromEntries(Object.entries(project).filter(([key]) => key !== "updatedAt")));
+}
+
+export function saveRecoveryDraft(
+  project: ScriptProject,
+  filePath: string | null,
+  baselineFingerprint: string,
+  storage: ProjectStorage = window.localStorage,
+): void {
+  storage.setItem(RECOVERY_DRAFT_KEY, JSON.stringify({
+    formatVersion: 1,
+    project,
+    filePath,
+    baselineFingerprint,
+  }));
+}
+
+export function loadRecoveryDraft(storage: ProjectStorage = window.localStorage): RecoveryDraft | null {
+  let serialized: string | null;
+  try { serialized = storage.getItem(RECOVERY_DRAFT_KEY); } catch { return null; }
   if (!serialized) return null;
   try {
-    return deserializeProject(serialized);
+    const value: unknown = JSON.parse(serialized) as unknown;
+    if (!isRecord(value) || value.formatVersion !== 1 || typeof value.baselineFingerprint !== "string"
+      || (value.filePath !== null && typeof value.filePath !== "string")) {
+      throw new Error("Invalid recovery draft");
+    }
+    return {
+      project: deserializeProject(JSON.stringify(value.project)),
+      filePath: value.filePath,
+      baselineFingerprint: value.baselineFingerprint,
+    };
   } catch {
-    storage.removeItem(LOCAL_PROJECT_KEY);
+    storage.removeItem(RECOVERY_DRAFT_KEY);
     return null;
   }
 }
 
-export function saveLocalProject(project: ScriptProject, storage: ProjectStorage = window.localStorage): void {
-  storage.setItem(LOCAL_PROJECT_KEY, serializeProject(project));
+export function clearRecoveryDraft(storage: ProjectStorage = window.localStorage): void {
+  storage.removeItem(RECOVERY_DRAFT_KEY);
 }
 
 function chooseBrowserFile(): Promise<File | null> {
@@ -82,4 +117,8 @@ function downloadBrowserFile(content: string, filename: string): void {
 function safeFileName(title: string): string {
   const withoutControls = [...title.trim()].filter((character) => character.charCodeAt(0) >= 32).join("");
   return withoutControls.replace(/[<>:"/\\|?*]/gu, "-").slice(0, 80) || "guion";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
