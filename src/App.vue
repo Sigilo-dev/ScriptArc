@@ -98,7 +98,7 @@ const countdownPurpose = ref<"playback" | "recording" | null>(null);
 const appReady = ref(false);
 const unsavedDialogOpen = ref(false);
 let unsavedChoiceResolver: ((choice: UnsavedChoice) => void) | null = null;
-let allowWindowClose = false;
+let windowCloseInProgress = false;
 let closeListener: (() => void) | undefined;
 let noticeTimeout: number | undefined;
 let controlsHideTimeout: number | undefined;
@@ -294,10 +294,26 @@ async function saveProject(saveAs = false): Promise<boolean> {
 }
 
 async function requestWindowClose() {
+  if (windowCloseInProgress) return;
+  windowCloseInProgress = true;
   persistRecoveryDraft();
-  if (!(await confirmLeavingDirtyProject())) return;
-  allowWindowClose = true;
-  await getCurrentWindow().close();
+  try {
+    if (!(await confirmLeavingDirtyProject())) {
+      windowCloseInProgress = false;
+      return;
+    }
+    // Destroy bypasses Tauri's close-request hook, which has already been handled above.
+    // Mark the session clean after an explicit discard so unmount recovery cannot restore it.
+    hasUnsavedChanges.value = false;
+    clearRecoveryDraft();
+    cancelCountdown();
+    stopRecording();
+    stopPlayback();
+    await getCurrentWindow().destroy();
+  } catch (error) {
+    windowCloseInProgress = false;
+    showNotice(error instanceof Error ? error.message : t("closeFailed"));
+  }
 }
 
 function handlePrompterKey(event: KeyboardEvent) {
@@ -365,9 +381,8 @@ onMounted(async () => {
   try {
     if (isTauri()) {
       closeListener = await getCurrentWindow().onCloseRequested((event) => {
-        if (allowWindowClose) return;
         event.preventDefault();
-        if (unsavedDialogOpen.value) return;
+        if (windowCloseInProgress || unsavedDialogOpen.value) return;
         void requestWindowClose();
       });
     } else {
