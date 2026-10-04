@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { isTauri } from "@tauri-apps/api/core";
 import ScriptEditor from "./features/editor/ScriptEditor.vue";
 import { parseMarkdown } from "./features/markdown/parseMarkdown";
 import { createProject, updateProjectMarkdown } from "./features/project/projectModel";
 import { loadLocalProject, openProjectFile, saveLocalProject, saveProjectFile } from "./features/project/projectPersistence";
-import type { TimingMode } from "./shared/types";
+import { createAutomaticReadingWords } from "./features/teleprompter/automaticTiming";
+import type { ReadingWord, TimingMode } from "./shared/types";
 
 type Screen = "editor" | "teleprompter";
 
@@ -18,10 +19,15 @@ const sourceMarkdown = computed({
 const timingMode = computed(() => project.value.timingMode);
 const cursor = ref(0);
 const document = computed(() => parseMarkdown(sourceMarkdown.value));
-const words = computed(() => document.value.tokens);
+const words = computed<ReadingWord[]>(() => timingMode.value === "automatic"
+  ? createAutomaticReadingWords(document.value, project.value.automaticTiming)
+  : document.value.tokens.map((token) => ({ ...token, sourceTokenIndex: token.index, durationMilliseconds: 0, isNumberExpansion: false })));
+const isPlaying = ref(false);
 const filePath = ref<string | null>(null);
 const notice = ref("");
+const wordElements = new Map<number, HTMLElement>();
 let noticeTimeout: number | undefined;
+let playbackTimer: number | undefined;
 
 watch(project, (value) => {
   try {
@@ -32,6 +38,7 @@ watch(project, (value) => {
 }, { deep: true });
 
 function start(mode: TimingMode) {
+  stopPlayback();
   project.value = { ...project.value, timingMode: mode };
   cursor.value = 0;
   screen.value = "teleprompter";
@@ -84,21 +91,69 @@ function handlePrompterKey(event: KeyboardEvent) {
 
 onMounted(() => window.addEventListener("keydown", handlePrompterKey));
 onBeforeUnmount(() => {
+  stopPlayback();
   window.removeEventListener("keydown", handlePrompterKey);
   if (noticeTimeout !== undefined) window.clearTimeout(noticeTimeout);
 });
 
 function returnToEditor() {
+  stopPlayback();
   screen.value = "editor";
 }
 
 function advance() {
-  cursor.value = Math.min(cursor.value + 1, Math.max(0, words.value.length - 1));
+  stopPlayback();
+  cursor.value = Math.min(cursor.value + 1, words.value.length);
 }
 
 function retreat() {
+  stopPlayback();
   cursor.value = Math.max(0, cursor.value - 1);
 }
+
+function togglePlayback() {
+  if (isPlaying.value) {
+    stopPlayback();
+    return;
+  }
+  if (!words.value.length) return;
+  if (cursor.value >= words.value.length) cursor.value = 0;
+  isPlaying.value = true;
+  scheduleAutomaticStep();
+}
+
+function scheduleAutomaticStep() {
+  const word = words.value[cursor.value];
+  if (!word || !isPlaying.value) {
+    stopPlayback();
+    return;
+  }
+  playbackTimer = window.setTimeout(() => {
+    if (cursor.value >= words.value.length - 1) {
+      cursor.value = words.value.length;
+      stopPlayback();
+      return;
+    }
+    cursor.value += 1;
+    scheduleAutomaticStep();
+  }, word.durationMilliseconds);
+}
+
+function stopPlayback() {
+  isPlaying.value = false;
+  if (playbackTimer !== undefined) window.clearTimeout(playbackTimer);
+  playbackTimer = undefined;
+}
+
+function setWordElement(element: unknown, index: number) {
+  if (element instanceof HTMLElement) wordElements.set(index, element);
+  else wordElements.delete(index);
+}
+
+watch([screen, cursor], () => {
+  if (screen.value !== "teleprompter") return;
+  void nextTick(() => wordElements.get(cursor.value)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+}, { flush: "post" });
 </script>
 
 <template>
@@ -228,6 +283,7 @@ function retreat() {
           <span
             v-for="(word, index) in words"
             :key="`${index}-${word.visibleText}`"
+            :ref="(element) => setWordElement(element, index)"
             :class="[
               { 'word-current': index === cursor, 'word-spoken': index < cursor },
               word.emphasis ? `word-${word.emphasis}` : '',
@@ -257,7 +313,16 @@ function retreat() {
         >
           ←
         </button>
-        <span class="progress-label">{{ words.length ? `${cursor + 1} / ${words.length}` : "Sin texto" }}</span>
+        <button
+          v-if="timingMode === 'automatic'"
+          class="button button-secondary playback-button"
+          type="button"
+          :disabled="!words.length"
+          @click="togglePlayback"
+        >
+          {{ isPlaying ? "Pausar" : "Reproducir" }}
+        </button>
+        <span class="progress-label">{{ words.length ? `${Math.min(cursor + 1, words.length)} / ${words.length}` : "Sin texto" }}</span>
         <button
           class="button button-primary"
           type="button"

@@ -60,3 +60,9 @@ export interface ParsedMarkdownDocument {
   blocks: MarkdownBlock[];
   tokens: MarkdownToken[];
 }
+
+export interface ReadingWord extends MarkdownToken {
+  sourceTokenIndex: number;
+  durationMilliseconds: number;
+  isNumberExpansion: boolean;
+}
