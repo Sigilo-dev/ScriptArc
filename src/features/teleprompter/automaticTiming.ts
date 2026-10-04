@@ -4,7 +4,9 @@ import { pronounceNumericToken } from "./numberToWords";
 export function createAutomaticReadingWords(
   document: ParsedMarkdownDocument,
   settings: AutomaticTimingSettings,
+  wordsPerMinute = 160,
 ): ReadingWord[] {
+  const speedScale = 160 / Math.max(80, Math.min(240, wordsPerMinute));
   const finalTokens = new Set(document.blocks.map((block) => block.tokenEnd - 1));
   const words: ReadingWord[] = [];
   for (const token of document.tokens) {
@@ -22,7 +24,7 @@ export function createAutomaticReadingWords(
         visibleText,
         spokenText: visibleText,
         punctuation,
-        durationMilliseconds: Math.max(180, visibleText.length * settings.baseMillisecondsPerCharacter) + pause,
+        durationMilliseconds: Math.max(180, Math.round(visibleText.length * settings.baseMillisecondsPerCharacter * speedScale)) + pause,
         isNumberExpansion: spokenNumber !== null,
       });
     });

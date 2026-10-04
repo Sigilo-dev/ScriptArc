@@ -7,6 +7,7 @@ import { createProject, updateProjectMarkdown } from "./features/project/project
 import { loadLocalProject, openProjectFile, saveLocalProject, saveProjectFile } from "./features/project/projectPersistence";
 import { createAutomaticReadingWords } from "./features/teleprompter/automaticTiming";
 import { manualWordDuration, upsertManualWordTiming } from "./features/teleprompter/manualTiming";
+import SettingsPanel from "./features/settings/SettingsPanel.vue";
 import type { ReadingWord, TimingMode } from "./shared/types";
 
 type Screen = "editor" | "teleprompter";
@@ -22,11 +23,12 @@ const cursor = ref(0);
 const isRecording = ref(false);
 const document = computed(() => parseMarkdown(sourceMarkdown.value));
 const words = computed<ReadingWord[]>(() => timingMode.value === "automatic"
-  ? createAutomaticReadingWords(document.value, project.value.automaticTiming)
+  ? createAutomaticReadingWords(document.value, project.value.automaticTiming, project.value.preferences.wordsPerMinute)
   : document.value.tokens.map((token) => ({ ...token, sourceTokenIndex: token.index, durationMilliseconds: 0, isNumberExpansion: false })));
 const isPlaying = ref(false);
 const filePath = ref<string | null>(null);
 const notice = ref("");
+const settingsOpen = ref(false);
 const wordElements = new Map<number, HTMLElement>();
 let noticeTimeout: number | undefined;
 let playbackTimer: number | undefined;
@@ -41,6 +43,7 @@ watch(project, (value) => {
 }, { deep: true });
 
 function start(mode: TimingMode) {
+  settingsOpen.value = false;
   stopRecording();
   stopPlayback();
   project.value = { ...project.value, timingMode: mode };
@@ -61,6 +64,7 @@ async function openProject() {
     stopRecording();
     stopPlayback();
     project.value = opened.project;
+    settingsOpen.value = false;
     filePath.value = opened.filePath;
     cursor.value = 0;
     showNotice(`Proyecto abierto: ${opened.project.title}`);
@@ -103,6 +107,7 @@ onBeforeUnmount(() => {
 });
 
 function returnToEditor() {
+  settingsOpen.value = false;
   stopRecording();
   stopPlayback();
   screen.value = "editor";
@@ -197,7 +202,8 @@ function scheduleNextWord() {
 
 function playbackDuration(word: ReadingWord): number {
   if (timingMode.value === "automatic") return word.durationMilliseconds;
-  const fallback = Math.max(250, word.visibleText.length * project.value.automaticTiming.baseMillisecondsPerCharacter);
+  const speedScale = 160 / project.value.preferences.wordsPerMinute;
+  const fallback = Math.max(250, Math.round(word.visibleText.length * project.value.automaticTiming.baseMillisecondsPerCharacter * speedScale));
   return manualWordDuration(project.value.manualTimings, word.sourceTokenIndex, fallback);
 }
 
@@ -221,7 +227,8 @@ watch([screen, cursor], () => {
 <template>
   <main
     class="app-shell"
-    :class="`screen-${screen}`"
+    :class="[`screen-${screen}`, `theme-${project.preferences.theme}`]"
+    :style="{ '--prompter-font-size': `${project.preferences.fontSize}px` }"
   >
     <template v-if="screen === 'editor'">
       <header class="topbar">
@@ -242,10 +249,20 @@ watch([screen, cursor], () => {
           type="button"
           aria-label="Configuración"
           title="Configuración"
+          :aria-expanded="settingsOpen"
+          @click="settingsOpen = !settingsOpen"
         >
           <span aria-hidden="true">⚙</span>
         </button>
       </header>
+      <SettingsPanel
+        v-if="settingsOpen"
+        v-model:theme="project.preferences.theme"
+        v-model:language="project.automaticTiming.language"
+        v-model:words-per-minute="project.preferences.wordsPerMinute"
+        v-model:font-size="project.preferences.fontSize"
+        @close="settingsOpen = false"
+      />
 
       <section
         class="editor-view"
@@ -332,10 +349,20 @@ watch([screen, cursor], () => {
           type="button"
           aria-label="Configuración"
           title="Configuración"
+          :aria-expanded="settingsOpen"
+          @click="settingsOpen = !settingsOpen"
         >
           ⚙
         </button>
       </header>
+      <SettingsPanel
+        v-if="settingsOpen"
+        v-model:theme="project.preferences.theme"
+        v-model:language="project.automaticTiming.language"
+        v-model:words-per-minute="project.preferences.wordsPerMinute"
+        v-model:font-size="project.preferences.fontSize"
+        @close="settingsOpen = false"
+      />
       <section
         class="prompter-view"
         aria-label="Teleprompter"

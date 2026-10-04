@@ -37,4 +37,11 @@ describe("automatic reading words", () => {
     expect(words[2].durationMilliseconds).toBe(5 * 78 + 420 + 100);
     expect(words[3].durationMilliseconds).toBe(5 * 78 + 100);
   });
+
+  it("scales word duration with the selected reading rate", () => {
+    const document = parseMarkdown("ScriptArc");
+    const slower = createAutomaticReadingWords(document, defaultAutomaticTiming, 80);
+    const faster = createAutomaticReadingWords(document, defaultAutomaticTiming, 240);
+    expect(slower[0].durationMilliseconds).toBeGreaterThan(faster[0].durationMilliseconds);
+  });
 });

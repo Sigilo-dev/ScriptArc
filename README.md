@@ -18,7 +18,7 @@ El proyecto está pensado para ser abierto y modificable. La aplicación guarda 
 2. Elige **Automático** para que la aplicación calcule el ritmo, o **Manual** para registrar tu ritmo. En modo manual, pulsa **Grabar**, lee la palabra blanca y pulsa la flecha derecha al terminar cada palabra; después puedes reproducir ese ritmo.
 3. Lee el texto en la pantalla del teleprompter. Usa las flechas para avanzar o retroceder y **Esc** para volver al editor.
 4. Guarda o abre un proyecto local con extensión `.scriptarc` para continuar más tarde. En la app de escritorio se usa el selector nativo de archivos; la vista web permite abrir y descargar proyectos.
-5. Selecciona un tema desde la configuración.
+5. Selecciona uno de los seis temas y ajusta idioma, velocidad y tamaño de letra desde el engranaje.
 
 El editor conserva Markdown como texto fuente. Los encabezados y formatos en negrita, cursiva o tachado se interpretan para la lectura; no se pronuncian los símbolos Markdown.
 
