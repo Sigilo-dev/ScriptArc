@@ -6,19 +6,19 @@ import type {
   UserPreferences,
 } from "../../shared/types";
 import { parseMarkdown } from "../markdown/parseMarkdown";
-import { THEME_PALETTES } from "../settings/themes";
 
 export const CURRENT_PROJECT_FORMAT = 2 as const;
 
 export const defaultUserPreferences: UserPreferences = {
   interfaceLanguage: "es",
   theme: "white",
-  customPalette: { ...THEME_PALETTES.white },
-  customPaletteInitialized: false,
+  customThemes: [],
   defaultFontSize: 56,
   defaultWordsPerMinute: 160,
   defaultLanguage: "es",
   countdownSeconds: 5,
+  playbackCountdownEnabled: false,
+  playbackCountdownSeconds: 5,
   hideControlsAutomatically: true,
 } as const;
 

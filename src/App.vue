@@ -29,7 +29,7 @@ import TeleprompterText from "./features/teleprompter/TeleprompterText.vue";
 import { formatPlaybackTime } from "./features/teleprompter/playbackState";
 import { translate, translateErrorMessage, type UiTextKey } from "./shared/localization";
 import { usePlayback } from "./features/teleprompter/usePlayback";
-import type { Language, ReadingWord, ThemePalette, TimingMode, UserPreferences } from "./shared/types";
+import type { CustomTheme, Language, PresetThemeId, ReadingWord, ThemeId, TimingMode, UserPreferences } from "./shared/types";
 import { THEME_PALETTES } from "./features/settings/themes";
 
 type Screen = "editor" | "teleprompter";
@@ -44,9 +44,10 @@ const savedFingerprint = ref(projectFingerprint(project.value));
 const hasUnsavedChanges = ref(false);
 const displayFileName = computed(() => filePath.value?.split(/[\\/]/u).pop() ?? t("unsavedProject"));
 const appStyle = computed(() => {
-  const palette = userPreferences.value.theme === "custom"
-    ? userPreferences.value.customPalette
-    : THEME_PALETTES[userPreferences.value.theme];
+  const theme = userPreferences.value.theme;
+  const palette = theme.startsWith("custom:")
+    ? userPreferences.value.customThemes.find(({ id }) => id === theme.slice("custom:".length))?.palette ?? THEME_PALETTES.white
+    : THEME_PALETTES[theme as PresetThemeId];
   return {
     "--prompter-font-size": `${project.value.teleprompterSettings.fontSize}px`,
     "--surface": palette.surface,
@@ -455,9 +456,8 @@ function retreat() {
   playback.previous();
 }
 
-function runWithCountdown(action: () => void, purpose: "playback" | "recording") {
+function runWithCountdown(action: () => void, purpose: "playback" | "recording", seconds = userPreferences.value.countdownSeconds) {
   cancelCountdown();
-  const seconds = userPreferences.value.countdownSeconds;
   if (seconds <= 0) {
     action();
     return;
@@ -556,7 +556,11 @@ function togglePlayback() {
     showNotice(t("recordFirst"));
     return;
   }
-  runWithCountdown(playback.play, "playback");
+  if (userPreferences.value.playbackCountdownEnabled) {
+    runWithCountdown(playback.play, "playback", userPreferences.value.playbackCountdownSeconds);
+  } else {
+    playback.play();
+  }
 }
 
 function playbackDuration(word: ReadingWord): number {
@@ -578,16 +582,20 @@ function adjustFontSize(amount: number) {
   hasUnsavedChanges.value = true;
 }
 
-function updateTheme(value: UserPreferences["theme"]) {
-  if (value === "custom" && !userPreferences.value.customPaletteInitialized) {
-    const currentTheme = userPreferences.value.theme;
-    userPreferences.value.customPalette = { ...THEME_PALETTES[currentTheme === "custom" ? "white" : currentTheme] };
-    userPreferences.value.customPaletteInitialized = true;
-  }
-  userPreferences.value.theme = value;
+function updateTheme(value: ThemeId) { userPreferences.value.theme = value; }
+function createCustomTheme(value: { name: string; baseTheme: PresetThemeId }) {
+  const id = globalThis.crypto?.randomUUID?.() ?? `theme-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const theme: CustomTheme = { id, name: value.name.trim().slice(0, 60), baseTheme: value.baseTheme, palette: { ...THEME_PALETTES[value.baseTheme] } };
+  userPreferences.value.customThemes = [...userPreferences.value.customThemes, theme];
+  userPreferences.value.theme = `custom:${id}`;
 }
-function updateCustomPalette(value: ThemePalette) {
-  userPreferences.value.customPalette = value;
+function updateCustomTheme(value: CustomTheme) {
+  userPreferences.value.customThemes = userPreferences.value.customThemes.map((theme) => theme.id === value.id ? value : theme);
+}
+function deleteCustomTheme(id: string) {
+  const removed = userPreferences.value.customThemes.find((theme) => theme.id === id);
+  userPreferences.value.customThemes = userPreferences.value.customThemes.filter((theme) => theme.id !== id);
+  if (userPreferences.value.theme === `custom:${id}`) userPreferences.value.theme = removed?.baseTheme ?? "white";
 }
 function updateInterfaceLanguage(value: Language) { userPreferences.value.interfaceLanguage = value; }
 function updateLanguage(value: Language) { userPreferences.value.defaultLanguage = value; }
@@ -642,7 +650,7 @@ async function toggleFullscreen() {
         v-if="settingsOpen"
         :interface-language="userPreferences.interfaceLanguage"
         :theme="userPreferences.theme"
-        :custom-palette="userPreferences.customPalette"
+        :custom-themes="userPreferences.customThemes"
         :language="userPreferences.defaultLanguage"
         :words-per-minute="userPreferences.defaultWordsPerMinute"
         :font-size="userPreferences.defaultFontSize"
@@ -650,7 +658,9 @@ async function toggleFullscreen() {
         :hide-controls-automatically="userPreferences.hideControlsAutomatically"
         @update:interface-language="updateInterfaceLanguage"
         @update:theme="updateTheme"
-        @update:custom-palette="updateCustomPalette"
+        @create:custom-theme="createCustomTheme"
+        @update:custom-theme="updateCustomTheme"
+        @delete:custom-theme="deleteCustomTheme"
         @update:language="updateLanguage"
         @update:words-per-minute="updateWordsPerMinute"
         @update:font-size="updateFontSize"
@@ -810,7 +820,7 @@ async function toggleFullscreen() {
         v-if="settingsOpen"
         :interface-language="userPreferences.interfaceLanguage"
         :theme="userPreferences.theme"
-        :custom-palette="userPreferences.customPalette"
+        :custom-themes="userPreferences.customThemes"
         :language="userPreferences.defaultLanguage"
         :words-per-minute="userPreferences.defaultWordsPerMinute"
         :font-size="userPreferences.defaultFontSize"
@@ -818,7 +828,9 @@ async function toggleFullscreen() {
         :hide-controls-automatically="userPreferences.hideControlsAutomatically"
         @update:interface-language="updateInterfaceLanguage"
         @update:theme="updateTheme"
-        @update:custom-palette="updateCustomPalette"
+        @create:custom-theme="createCustomTheme"
+        @update:custom-theme="updateCustomTheme"
+        @delete:custom-theme="deleteCustomTheme"
         @update:language="updateLanguage"
         @update:words-per-minute="updateWordsPerMinute"
         @update:font-size="updateFontSize"
@@ -890,6 +902,32 @@ async function toggleFullscreen() {
             @input="seekFromProgress"
           >
           <span>-{{ formatPlaybackTime(remainingMilliseconds) }}</span>
+          <div class="playback-countdown-control">
+            <button
+              class="countdown-toggle"
+              type="button"
+              :aria-label="userPreferences.playbackCountdownEnabled ? t('disablePlaybackCountdown') : t('enablePlaybackCountdown')"
+              :title="t('playbackCountdownControl')"
+              :aria-pressed="userPreferences.playbackCountdownEnabled"
+              @click="userPreferences.playbackCountdownEnabled = !userPreferences.playbackCountdownEnabled"
+            >
+              ⏱
+            </button>
+            <select
+              :value="userPreferences.playbackCountdownSeconds"
+              :aria-label="t('playbackCountdownDuration')"
+              :title="t('playbackCountdownDuration')"
+              @change="userPreferences.playbackCountdownSeconds = Number(($event.target as HTMLSelectElement).value)"
+            >
+              <option
+                v-for="seconds in 10"
+                :key="seconds"
+                :value="seconds"
+              >
+                {{ seconds }}{{ t('secondsShort') }}
+              </option>
+            </select>
+          </div>
         </div>
         <p
           v-if="timingMode === 'manual' && manualSession.status !== 'review'"

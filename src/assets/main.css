@@ -107,6 +107,20 @@ h1 span { color: var(--text-soft); }
 .theme-option { min-height: 59px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-muted); color: var(--text); font-size: 10px; cursor: pointer; }
 .theme-option[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 .theme-swatch { width: 17px; height: 17px; border: 1px solid rgba(127,127,127,.2); border-radius: 50%; }
+.custom-theme-heading { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+.custom-theme-heading .settings-label { margin: 0; }
+.theme-add-button { width: 27px; height: 27px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-muted); color: var(--text); font-size: 19px; line-height: 1; cursor: pointer; }
+.theme-add-button:hover, .custom-theme-delete:hover { border-color: var(--accent); color: var(--accent); }
+.custom-theme-create { display: grid; gap: 8px; margin-top: 9px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-muted); }
+.custom-theme-create > input, .custom-theme-create select { width: 100%; min-height: 35px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); font: inherit; font-size: 12px; }
+.custom-theme-create label { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--text-soft); font-size: 11px; }
+.custom-theme-create select { width: 62%; }
+.custom-theme-create .button { min-height: 34px; }
+.custom-theme-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 8px; }
+.custom-theme-item { min-width: 0; display: flex; align-items: stretch; gap: 4px; }
+.custom-theme-option { flex: 1; min-width: 0; min-height: 50px; flex-direction: row; align-items: center; gap: 7px; overflow: hidden; }
+.custom-theme-option > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.custom-theme-delete { flex: 0 0 28px; align-self: center; height: 28px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text-soft); font-size: 16px; cursor: pointer; }
 .settings-field select { width: 100%; min-height: 38px; padding: 0 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-muted); color: var(--text); font: inherit; }
 .settings-range > span { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .settings-range output { color: var(--text); font-variant-numeric: tabular-nums; }
@@ -168,7 +182,11 @@ h1 span { color: var(--text-soft); }
 .prompter-text .word-strikethrough { text-decoration: line-through; }
 .prompter-controls { position: fixed; z-index: 30; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; align-items: center; gap: 9px; min-height: 100px; padding: 10px 22px 17px; border-top: 1px solid color-mix(in srgb, var(--prompter-current-color), transparent 88%); background: color-mix(in srgb, var(--prompter-bg), transparent 7%); backdrop-filter: blur(13px); transition: opacity .22s ease, transform .22s ease; }
 .prompter-controls.controls-hidden { opacity: 0; transform: translateY(110%); pointer-events: none; }
-.playback-progress { display: grid; grid-template-columns: auto minmax(180px, min(650px, 72vw)) auto; align-items: center; gap: 13px; width: min(820px, 100%); color: var(--prompter-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.playback-progress { display: grid; grid-template-columns: auto minmax(180px, min(650px, 72vw)) auto auto; align-items: center; gap: 13px; width: min(900px, 100%); color: var(--prompter-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.playback-countdown-control { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
+.countdown-toggle { width: 31px; height: 29px; display: grid; place-items: center; border: 1px solid color-mix(in srgb, var(--prompter-current-color), transparent 78%); border-radius: 7px; background: transparent; color: var(--prompter-muted); font-size: 14px; cursor: pointer; }
+.countdown-toggle[aria-pressed="true"] { border-color: var(--prompter-current-color); background: color-mix(in srgb, var(--prompter-current-color), transparent 88%); color: var(--prompter-current-color); }
+.playback-countdown-control select { width: 45px; height: 29px; padding: 0 3px; border: 1px solid color-mix(in srgb, var(--prompter-current-color), transparent 78%); border-radius: 7px; background: var(--prompter-bg); color: var(--prompter-current-color); font: inherit; font-size: 10px; }
 .progress-slider { width: 100%; height: 5px; margin: 9px 0; border-radius: 5px; background: linear-gradient(to right, var(--prompter-current-color) var(--progress, 0%), color-mix(in srgb, var(--prompter-muted), transparent 68%) var(--progress, 0%)); appearance: none; cursor: pointer; }
 .progress-slider::-webkit-slider-thumb { width: 14px; height: 14px; border: 2px solid var(--prompter-bg); border-radius: 50%; background: var(--prompter-current-color); box-shadow: 0 0 0 4px color-mix(in srgb, var(--prompter-current-color), transparent 84%); appearance: none; }
 .progress-slider::-moz-range-thumb { width: 11px; height: 11px; border: 2px solid var(--prompter-bg); border-radius: 50%; background: var(--prompter-current-color); box-shadow: 0 0 0 4px color-mix(in srgb, var(--prompter-current-color), transparent 84%); }
@@ -187,7 +205,7 @@ h1 span { color: var(--text-soft); }
 @media (max-width: 640px) {
   .screen-teleprompter .prompter-view { width: calc(100% - 36px); padding: 44vh 0 42vh; }
   .prompter-toolbar { height: 64px; padding: 0 18px; }
-  .playback-progress { grid-template-columns: auto minmax(80px, 1fr) auto; gap: 8px; }
+  .playback-progress { grid-template-columns: auto minmax(50px, 1fr) auto auto; gap: 6px; }
   .control-buttons { gap: 6px; }
   .control-buttons .button { min-width: 38px; padding: 0 10px; }
   .control-buttons .playback-button { min-width: 88px; }

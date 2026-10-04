@@ -1,5 +1,6 @@
-import type { Language, ThemeId, ThemePalette, UserPreferences } from "../../shared/types";
+import type { CustomTheme, Language, PresetThemeId, ThemeId, ThemePalette, UserPreferences } from "../../shared/types";
 import { defaultUserPreferences } from "../project/projectModel";
+import { isPresetThemeId } from "./themes";
 
 export const USER_PREFERENCES_KEY = "scriptarc.user-preferences.v1";
 
@@ -10,33 +11,52 @@ export function loadUserPreferences(storage: PreferenceStorage = window.localSto
   try {
     serialized = storage.getItem(USER_PREFERENCES_KEY);
   } catch {
-    return { ...defaultUserPreferences };
+    return { ...defaultUserPreferences, customThemes: [] };
   }
-  if (!serialized) return { ...defaultUserPreferences };
+  if (!serialized) return { ...defaultUserPreferences, customThemes: [] };
   try {
     const value: unknown = JSON.parse(serialized) as unknown;
     if (!isRecord(value)) throw new Error("Invalid preferences");
-    const result: UserPreferences = {
-      interfaceLanguage: isLanguage(value.interfaceLanguage) ? value.interfaceLanguage : defaultUserPreferences.interfaceLanguage,
-      theme: isTheme(value.theme) ? value.theme : defaultUserPreferences.theme,
-      customPalette: readThemePalette(value.customPalette, defaultUserPreferences.customPalette),
-      customPaletteInitialized: typeof value.customPaletteInitialized === "boolean"
-        ? value.customPaletteInitialized
-        : defaultUserPreferences.customPaletteInitialized,
+    const interfaceLanguage = isLanguage(value.interfaceLanguage) ? value.interfaceLanguage : defaultUserPreferences.interfaceLanguage;
+    const customThemes = readCustomThemes(value.customThemes);
+
+    // Migrate the previous single-custom-palette preference without losing the user's colors.
+    if ((value.theme === "custom" || value.customPaletteInitialized === true)
+      && !customThemes.some(({ id }) => id === "legacy-custom")) {
+      const palette = readThemePalette(value.customPalette);
+      if (palette) {
+        customThemes.push({
+          id: "legacy-custom",
+          name: interfaceLanguage === "en" ? "Custom theme" : "Tema personalizado",
+          baseTheme: "white",
+          palette,
+        });
+      }
+    }
+
+    return {
+      interfaceLanguage,
+      theme: resolveTheme(value.theme, customThemes),
+      customThemes,
       defaultFontSize: boundedNumber(value.defaultFontSize, 30, 96, defaultUserPreferences.defaultFontSize),
       defaultWordsPerMinute: boundedNumber(value.defaultWordsPerMinute, 80, 240, defaultUserPreferences.defaultWordsPerMinute),
       defaultLanguage: isLanguage(value.defaultLanguage) ? value.defaultLanguage : defaultUserPreferences.defaultLanguage,
       countdownSeconds: [0, 3, 5, 10].includes(value.countdownSeconds as number)
         ? value.countdownSeconds as number
         : defaultUserPreferences.countdownSeconds,
+      playbackCountdownEnabled: typeof value.playbackCountdownEnabled === "boolean"
+        ? value.playbackCountdownEnabled
+        : defaultUserPreferences.playbackCountdownEnabled,
+      playbackCountdownSeconds: Number.isInteger(value.playbackCountdownSeconds)
+        ? Math.max(1, Math.min(10, value.playbackCountdownSeconds as number))
+        : defaultUserPreferences.playbackCountdownSeconds,
       hideControlsAutomatically: typeof value.hideControlsAutomatically === "boolean"
         ? value.hideControlsAutomatically
         : defaultUserPreferences.hideControlsAutomatically,
     };
-    return result;
   } catch {
     try { storage.removeItem(USER_PREFERENCES_KEY); } catch { /* Storage may be unavailable. */ }
-    return { ...defaultUserPreferences };
+    return { ...defaultUserPreferences, customThemes: [] };
   }
 }
 
@@ -58,8 +78,14 @@ function isLanguage(value: unknown): value is Language {
   return value === "es" || value === "en";
 }
 
-function isTheme(value: unknown): value is ThemeId {
-  return value === "white" || value === "gray" || value === "orange" || value === "blue" || value === "pink" || value === "black" || value === "custom";
+function resolveTheme(value: unknown, customThemes: CustomTheme[]): ThemeId {
+  if (typeof value === "string" && isPresetThemeId(value)) return value;
+  if (value === "custom" && customThemes.some(({ id }) => id === "legacy-custom")) return "custom:legacy-custom";
+  if (typeof value === "string" && value.startsWith("custom:")) {
+    const id = value.slice("custom:".length);
+    if (customThemes.some((theme) => theme.id === id)) return `custom:${id}`;
+  }
+  return defaultUserPreferences.theme;
 }
 
 const THEME_PALETTE_KEYS: readonly (keyof ThemePalette)[] = [
@@ -67,13 +93,34 @@ const THEME_PALETTE_KEYS: readonly (keyof ThemePalette)[] = [
   "prompterBg", "prompterMuted", "prompterTextColor", "prompterCurrentColor", "prompterSpokenColor",
 ];
 
-function readThemePalette(value: unknown, fallback: ThemePalette): ThemePalette {
-  if (!isRecord(value)) return { ...fallback };
+function readThemePalette(value: unknown): ThemePalette | null {
+  if (!isRecord(value)) return null;
   const result = {} as ThemePalette;
   for (const key of THEME_PALETTE_KEYS) {
     const color = value[key];
-    if (typeof color !== "string" || !/^#[\da-f]{6}$/iu.test(color)) return { ...fallback };
+    if (typeof color !== "string" || !/^#[\da-f]{6}$/iu.test(color)) return null;
     result[key] = color;
   }
   return result;
+}
+
+function readCustomThemes(value: unknown): CustomTheme[] {
+  if (!Array.isArray(value)) return [];
+  const themes: CustomTheme[] = [];
+  const seen = new Set<string>();
+  for (const candidate of value.slice(0, 100)) {
+    if (!isRecord(candidate) || typeof candidate.id !== "string" || !/^[\w-]{1,80}$/u.test(candidate.id)
+      || seen.has(candidate.id) || typeof candidate.name !== "string" || !candidate.name.trim()
+      || candidate.name.length > 60 || typeof candidate.baseTheme !== "string" || !isPresetThemeId(candidate.baseTheme)) continue;
+    const palette = readThemePalette(candidate.palette);
+    if (!palette) continue;
+    themes.push({
+      id: candidate.id,
+      name: candidate.name.trim(),
+      baseTheme: candidate.baseTheme as PresetThemeId,
+      palette,
+    });
+    seen.add(candidate.id);
+  }
+  return themes;
 }

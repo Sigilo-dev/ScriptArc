@@ -1,6 +1,7 @@
 export type Language = "es" | "en";
 export type TimingMode = "automatic" | "manual";
-export type ThemeId = "white" | "gray" | "orange" | "blue" | "pink" | "black" | "custom";
+export type PresetThemeId = "white" | "gray" | "orange" | "blue" | "pink" | "black";
+export type ThemeId = PresetThemeId | `custom:${string}`;
 
 export interface ThemePalette {
   surface: string;
@@ -15,6 +16,13 @@ export interface ThemePalette {
   prompterTextColor: string;
   prompterCurrentColor: string;
   prompterSpokenColor: string;
+}
+
+export interface CustomTheme {
+  id: string;
+  name: string;
+  baseTheme: PresetThemeId;
+  palette: ThemePalette;
 }
 
 export interface AutomaticTimingSettings {
@@ -39,12 +47,13 @@ export interface TeleprompterPreferences {
 export interface UserPreferences {
   interfaceLanguage: Language;
   theme: ThemeId;
-  customPalette: ThemePalette;
-  customPaletteInitialized: boolean;
+  customThemes: CustomTheme[];
   defaultFontSize: number;
   defaultWordsPerMinute: number;
   defaultLanguage: Language;
   countdownSeconds: number;
+  playbackCountdownEnabled: boolean;
+  playbackCountdownSeconds: number;
   hideControlsAutomatically: boolean;
 }
 

@@ -1,9 +1,7 @@
-import type { ThemeId, ThemePalette } from "../../shared/types";
-
-export type PresetThemeId = Exclude<ThemeId, "custom">;
+import type { PresetThemeId, ThemeId, ThemePalette } from "../../shared/types";
 
 export interface ThemeOption {
-  id: ThemeId;
+  id: PresetThemeId;
   label: string;
   color: string;
 }
@@ -15,7 +13,6 @@ export const THEME_OPTIONS: readonly ThemeOption[] = [
   { id: "blue", label: "Azul", color: "#2563eb" },
   { id: "pink", label: "Rosa", color: "#db2777" },
   { id: "black", label: "Oscuro negro puro", color: "#000000" },
-  { id: "custom", label: "Personalizado", color: "#6d5dfc" },
 ];
 
 export const THEME_PALETTES: Readonly<Record<PresetThemeId, ThemePalette>> = {
@@ -57,6 +54,10 @@ export const THEME_PALETTES: Readonly<Record<PresetThemeId, ThemePalette>> = {
   },
 };
 
-export function isThemeId(value: string): value is ThemeId {
+export function isPresetThemeId(value: string): value is PresetThemeId {
   return THEME_OPTIONS.some((theme) => theme.id === value);
+}
+
+export function isThemeId(value: string): value is ThemeId {
+  return isPresetThemeId(value) || /^custom:[\w-]+$/u.test(value);
 }

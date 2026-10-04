@@ -19,7 +19,7 @@ The portable ZIP contains the runnable application and its license/readme. It is
 - Interface available in Spanish and English, switchable from the first screen.
 - Manual timing recording and playback controls.
 - Markdown scripts with headings, emphasis, links and punctuation-aware word steps.
-- Versioned `.scriptarc` project files, local recovery, six preset themes and a fully customizable saved palette.
+- Versioned `.scriptarc` project files, local recovery, six preset themes and multiple customizable palettes based on any preset.
 - Fullscreen reading, adjustable text size and keyboard controls.
 - Windows desktop app, portable release ZIP and standard setup installer.
 
@@ -33,7 +33,7 @@ Vue 3 and TypeScript power the interface, Vite builds the frontend, Tauri 2 and 
 2. Choose **Automatic** for generated timing or **Manual** to record your pace. In manual mode, read the highlighted word and press **→** or **Space** when you finish each word; stop to review the recorded timings.
 3. In the teleprompter, use **Space** to play/pause, **← / →** to move by word, **Home / End** to seek, and **Esc** to leave fullscreen. Press **Esc** again to return to the editor.
 4. Use **Save**, **Save as…** or **Open project** to continue later from a `.scriptarc` file. The project stores reading position and timings; changes are recovered locally if the app closes unexpectedly.
-5. Open settings to choose the interface and number languages, customize all theme colors, set speed and text size, and adjust the countdown and control visibility. Preferences are saved locally.
+5. Open settings to choose the interface and number languages, create custom themes from a preset, customize every color, and adjust speed, text size, recording countdown and control visibility. Preferences are saved locally. Playback starts immediately by default; use the timer control at the far right of the progress bar to enable a 1–10 second countdown.
 
 ## Develop and build
 

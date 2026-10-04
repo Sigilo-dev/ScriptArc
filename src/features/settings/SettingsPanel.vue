@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { Language, ThemeId, ThemePalette } from "../../shared/types";
+import { computed, ref } from "vue";
+import type { CustomTheme, Language, PresetThemeId, ThemeId, ThemePalette } from "../../shared/types";
 import { AUTOMATIC_TIMING_LIMITS } from "../teleprompter/automaticTiming";
 import { translate, type UiTextKey } from "../../shared/localization";
 import { THEME_OPTIONS } from "./themes";
@@ -7,7 +8,7 @@ import { THEME_OPTIONS } from "./themes";
 const props = defineProps<{
   interfaceLanguage: Language;
   theme: ThemeId;
-  customPalette: ThemePalette;
+  customThemes: CustomTheme[];
   language: Language;
   wordsPerMinute: number;
   fontSize: number;
@@ -19,7 +20,9 @@ const emit = defineEmits<{
   close: [];
   "update:interfaceLanguage": [value: Language];
   "update:theme": [value: ThemeId];
-  "update:customPalette": [value: ThemePalette];
+  "create:customTheme": [value: { name: string; baseTheme: PresetThemeId }];
+  "update:customTheme": [value: CustomTheme];
+  "delete:customTheme": [id: string];
   "update:language": [value: Language];
   "update:wordsPerMinute": [value: number];
   "update:fontSize": [value: number];
@@ -27,16 +30,15 @@ const emit = defineEmits<{
   "update:hideControlsAutomatically": [value: boolean];
 }>();
 
-const t = (key: UiTextKey) => translate(props.interfaceLanguage, key);
-const themeLabelKeys: Record<ThemeId, UiTextKey> = {
-  white: "themeWhite",
-  gray: "themeGray",
-  orange: "themeOrange",
-  blue: "themeBlue",
-  pink: "themePink",
-  black: "themeBlack",
-  custom: "themeCustom",
-};
+const t = (key: UiTextKey, values: Record<string, string | number> = {}) => translate(props.interfaceLanguage, key, values);
+const customThemeCreationOpen = ref(false);
+const customThemeName = ref("");
+const customThemeBase = ref<PresetThemeId>("white");
+const selectedCustomTheme = computed(() => {
+  if (!props.theme.startsWith("custom:")) return undefined;
+  const id = props.theme.slice("custom:".length);
+  return props.customThemes.find((theme) => theme.id === id);
+});
 const paletteFields: { key: keyof ThemePalette; label: UiTextKey }[] = [
   { key: "surface", label: "colorSurface" },
   { key: "surfaceMuted", label: "colorSurfaceMuted" },
@@ -51,10 +53,25 @@ const paletteFields: { key: keyof ThemePalette; label: UiTextKey }[] = [
   { key: "prompterCurrentColor", label: "colorPrompterCurrent" },
   { key: "prompterSpokenColor", label: "colorPrompterSpoken" },
 ];
+const themeLabelKeys: Record<PresetThemeId, UiTextKey> = {
+  white: "themeWhite", gray: "themeGray", orange: "themeOrange", blue: "themeBlue", pink: "themePink", black: "themeBlack",
+};
+
+function addCustomTheme() {
+  const name = customThemeName.value.trim();
+  if (!name) return;
+  emit("create:customTheme", { name, baseTheme: customThemeBase.value });
+  customThemeName.value = "";
+  customThemeCreationOpen.value = false;
+}
 
 function updatePaletteColor(key: keyof ThemePalette, event: Event) {
+  if (!selectedCustomTheme.value) return;
   const color = (event.target as HTMLInputElement).value;
-  emit("update:customPalette", { ...props.customPalette, [key]: color });
+  emit("update:customTheme", {
+    ...selectedCustomTheme.value,
+    palette: { ...selectedCustomTheme.value.palette, [key]: color },
+  });
 }
 </script>
 
@@ -97,19 +114,95 @@ function updatePaletteColor(key: keyof ThemePalette, event: Event) {
         >
           <span
             class="theme-swatch"
-            :style="{ backgroundColor: option.id === 'custom' ? customPalette.accent : option.color }"
+            :style="{ backgroundColor: option.color }"
           />
           <span>{{ t(themeLabelKeys[option.id]) }}</span>
         </button>
       </div>
+      <div class="custom-theme-heading">
+        <span class="settings-label">{{ t('customThemes') }}</span>
+        <button
+          class="theme-add-button"
+          type="button"
+          :aria-label="t('addCustomTheme')"
+          :title="t('addCustomTheme')"
+          @click="customThemeCreationOpen = !customThemeCreationOpen"
+        >
+          +
+        </button>
+      </div>
+      <form
+        v-if="customThemeCreationOpen"
+        class="custom-theme-create"
+        @submit.prevent="addCustomTheme"
+      >
+        <input
+          v-model="customThemeName"
+          type="text"
+          maxlength="60"
+          :placeholder="t('customThemeNamePlaceholder')"
+          :aria-label="t('customThemeName')"
+          required
+        >
+        <label>
+          <span>{{ t('customThemeBase') }}</span>
+          <select v-model="customThemeBase">
+            <option
+              v-for="option in THEME_OPTIONS"
+              :key="option.id"
+              :value="option.id"
+            >
+              {{ t(themeLabelKeys[option.id]) }}
+            </option>
+          </select>
+        </label>
+        <button
+          class="button button-primary"
+          type="submit"
+        >
+          {{ t('createTheme') }}
+        </button>
+      </form>
+      <div
+        v-if="customThemes.length"
+        class="custom-theme-options"
+      >
+        <div
+          v-for="customTheme in customThemes"
+          :key="customTheme.id"
+          class="custom-theme-item"
+        >
+          <button
+            class="theme-option custom-theme-option"
+            type="button"
+            :aria-pressed="theme === `custom:${customTheme.id}`"
+            @click="emit('update:theme', `custom:${customTheme.id}`)"
+          >
+            <span
+              class="theme-swatch"
+              :style="{ backgroundColor: customTheme.palette.accent }"
+            />
+            <span>{{ customTheme.name }}</span>
+          </button>
+          <button
+            class="custom-theme-delete"
+            type="button"
+            :aria-label="t('deleteCustomTheme', { name: customTheme.name })"
+            :title="t('deleteTheme')"
+            @click="emit('delete:customTheme', customTheme.id)"
+          >
+            ×
+          </button>
+        </div>
+      </div>
     </div>
 
     <section
-      v-if="theme === 'custom'"
+      v-if="selectedCustomTheme"
       class="custom-palette-editor"
       :aria-label="t('customizeColors')"
     >
-      <h3>{{ t('customizeColors') }}</h3>
+      <h3>{{ t('customizeColors') }} · {{ selectedCustomTheme.name }}</h3>
       <label
         v-for="field in paletteFields"
         :key="field.key"
@@ -118,7 +211,7 @@ function updatePaletteColor(key: keyof ThemePalette, event: Event) {
         <span>{{ t(field.label) }}</span>
         <input
           type="color"
-          :value="customPalette[field.key]"
+          :value="selectedCustomTheme.palette[field.key]"
           :aria-label="t(field.label)"
           @input="updatePaletteColor(field.key, $event)"
         >
@@ -160,7 +253,7 @@ function updatePaletteColor(key: keyof ThemePalette, event: Event) {
     </label>
 
     <label class="settings-field">
-      <span>{{ t('countdown') }}</span>
+      <span>{{ t('recordingCountdown') }}</span>
       <select
         :value="countdownSeconds"
         @change="emit('update:countdownSeconds', Number(($event.target as HTMLSelectElement).value))"
