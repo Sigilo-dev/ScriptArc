@@ -1,55 +1,73 @@
 # ScriptArc
 
-ScriptArc es un teleprompter de escritorio, ligero y configurable. Escribes un guion en Markdown, eliges lectura automática o manual y lo lees con una interfaz limpia que mantiene la atención en las palabras.
+Free and open-source desktop teleprompter with automatic word-level pacing, manual timing recording, Markdown scripts and configurable themes.
 
-El proyecto está pensado para ser abierto y modificable. La aplicación guarda los guiones en el dispositivo y no requiere cuentas, nube ni servicios externos. El repositorio todavía no declara una licencia; se debe añadir una antes de redistribuir el código como software con licencia abierta.
+## Download for Windows
 
-## Tecnologías
+**You do not need to compile ScriptArc to use it.** Go to [Latest Release](https://github.com/Sigilo-dev/ScriptArc/releases/latest) and choose either:
 
-- Vue 3 y TypeScript para la interfaz.
-- Vite para desarrollo y compilación web.
-- Tauri 2 y Rust para la aplicación de escritorio.
-- pnpm para instalar dependencias y ejecutar tareas.
-- Vitest para pruebas de utilidades.
+- **Portable:** download `ScriptArc-vX.Y.Z-windows-x64-portable.zip`, extract it, open the `ScriptArc` folder and run `ScriptArc.exe`.
+- **Setup:** download `ScriptArc-vX.Y.Z-windows-x64-setup.exe` for the standard Windows installation experience.
 
-## Uso
+The portable app needs no developer tools. Both options use the Microsoft Edge WebView2 runtime. Windows 10 version 1803 and later and Windows 11 normally include it; the setup installer downloads the WebView2 bootstrapper if it is missing, so an internet connection may be needed during installation.
 
-1. Abre ScriptArc y pega o escribe el guion en el editor.
-2. Elige **Automático** para que la aplicación calcule el ritmo, o **Manual** para registrar tu ritmo. En modo manual, pulsa **Grabar**, lee la palabra blanca y pulsa la flecha derecha al terminar cada palabra; después puedes reproducir ese ritmo.
-3. Lee el texto en la pantalla del teleprompter. Usa las flechas para avanzar o retroceder y **Esc** para volver al editor.
-4. Guarda o abre un proyecto local con extensión `.scriptarc` para continuar más tarde. En la app de escritorio se usa el selector nativo de archivos; la vista web permite abrir y descargar proyectos.
-5. Selecciona uno de los seis temas y ajusta idioma, velocidad y tamaño de letra desde el engranaje.
+The portable ZIP contains the runnable application and its license/readme. It is **not** the source-code ZIP attached automatically by GitHub.
 
-El editor conserva Markdown como texto fuente. Los encabezados y formatos en negrita, cursiva o tachado se interpretan para la lectura; no se pronuncian los símbolos Markdown.
+## What it includes
 
-## Ejecutar como desarrollador
+- Automatic word-level pacing in Spanish and English, including number-aware spoken timing.
+- Manual timing recording and playback controls.
+- Markdown scripts with headings, emphasis, links and punctuation-aware word steps.
+- Versioned `.scriptarc` project files, local recovery and six configurable themes.
+- Fullscreen reading, adjustable text size and keyboard controls.
+- Windows desktop app, portable release ZIP and standard setup installer.
 
-Se necesita Node.js, pnpm y Rust con los requisitos de escritorio de Tauri para Windows.
+## Built with
+
+Vue 3 and TypeScript power the interface, Vite builds the frontend, Tauri 2 and Rust provide the Windows desktop shell, and pnpm manages dependencies. Vitest runs the unit tests.
+
+## Use ScriptArc
+
+1. Paste or write a Markdown script in the editor.
+2. Choose **Automático** for generated timing or **Manual** to record your pace. In manual mode, read the highlighted word and press **→** when you finish each word; stop to review the recorded timings.
+3. In the teleprompter, use **Space** to play/pause, **← / →** to move by word, **Home / End** to seek, and **Esc** to leave fullscreen. Press **Esc** again to return to the editor.
+4. Use **Guardar**, **Guardar como…** or **Abrir proyecto** to continue later from a `.scriptarc` file. The project stores reading position and timings; changes are recovered locally if the app closes unexpectedly.
+5. Open settings to choose a theme, default language and speed, text size, countdown, and control visibility.
+
+## Develop and build
+
+On Windows, install Node.js, pnpm, Rust, Microsoft C++ Build Tools and the WebView2 runtime. Then:
 
 ```powershell
-cd E:\ScriptArc
+git clone https://github.com/Sigilo-dev/ScriptArc.git
+cd ScriptArc
 pnpm install
 pnpm tauri dev
 ```
 
-`pnpm dev` inicia solo la vista web de desarrollo.
-
-## Editar y generar una versión
-
-1. Edita los componentes y utilidades dentro de `src/`; Tauri y sus permisos se configuran en `src-tauri/`.
-2. Comprueba los cambios:
+Edit the Vue/TypeScript files under `src/` and desktop configuration under `src-tauri/`. Editing source code does not change an existing executable; build a new one from that source:
 
 ```powershell
 pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm tauri build --bundles nsis
 ```
 
-3. Genera la aplicación de escritorio:
+The setup installer is written to `src-tauri/target/release/bundle/nsis/`. Run `scripts\build-portable.bat` to build and package a local portable ZIP under `dist-release/`. `scripts\dev.bat` is a convenience launcher for developers; it is not the application.
+
+To publish a version, update the matching version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`, validate with `pnpm check:version`, then push the tag:
 
 ```powershell
-pnpm tauri build
+git tag vX.Y.Z
+git push origin vX.Y.Z
 ```
 
-El instalador y otros artefactos de Windows se generan en `src-tauri/target/release/bundle/`.
+GitHub Actions validates the tag and creates the setup installer and portable ZIP in a GitHub Release. Normal pushes and pull requests run CI but do not publish a release.
+
+The main code lives in `src/`, grouped by editor, teleprompter, project and settings features. Tauri configuration, Rust entry points and app icons live in `src-tauri/`; packaging and version scripts live in `scripts/`.
+
+## License
+
+ScriptArc is free and open source under the [MIT License](LICENSE).
