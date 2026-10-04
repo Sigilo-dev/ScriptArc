@@ -35,6 +35,17 @@ button:focus-visible, textarea:focus-visible, a:focus-visible { outline: 3px sol
 h1 { margin: 0; font-family: "Aptos Display", "Segoe UI", sans-serif; font-size: clamp(36px, 5.2vw, 62px); line-height: 1.09; letter-spacing: -.055em; font-weight: 700; }
 h1 span { color: #9aa7b8; }
 .script-input { display: block; width: 100%; min-height: min(36vh, 330px); resize: vertical; padding: 25px 27px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface-muted); color: var(--text); font-size: 16px; line-height: 1.75; transition: border-color .18s, box-shadow .18s; }
+.markdown-editor { overflow: hidden; border: 1px solid var(--line); border-radius: 15px; background: var(--surface-muted); transition: border-color .18s, box-shadow .18s; }
+.markdown-editor:focus-within { border-color: #abc4ff; box-shadow: 0 0 0 4px #eaf1ff; }
+.markdown-toolbar { min-height: 45px; display: flex; align-items: center; gap: 5px; padding: 0 15px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.format-button { width: 29px; height: 29px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: #657389; font-size: 13px; font-weight: 700; cursor: pointer; }
+.format-button:hover { background: var(--accent-soft); color: var(--accent); }
+.format-italic { font-style: italic; }
+.format-strike { text-decoration: line-through; }
+.toolbar-divider { width: 1px; height: 19px; margin: 0 5px; background: var(--line); }
+.toolbar-note { margin-left: auto; color: #99a5b4; font-size: 11px; }
+.markdown-editor .script-input { min-height: min(36vh, 285px); border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.markdown-editor .script-input:focus { border: 0; outline: none; }
 .script-input::placeholder { color: #9aa6b5; }
 .script-input:focus { border-color: #abc4ff; box-shadow: 0 0 0 4px #eaf1ff; outline: none; }
 .editor-actions { margin-top: 20px; display: flex; justify-content: space-between; align-items: center; gap: 20px; }
@@ -61,6 +72,9 @@ h1 span { color: #9aa7b8; }
 .prompter-text span { transition: color .25s, opacity .25s; }
 .prompter-text .word-current { color: #fff; }
 .prompter-text .word-spoken { color: #d35062; }
+.prompter-text .word-strong { font-weight: 800; }
+.prompter-text .word-emphasis { font-style: italic; }
+.prompter-text .word-strikethrough { text-decoration: line-through; }
 .empty-prompter { color: #9ab0ce; }
 .prompter-controls { position: sticky; bottom: 0; min-height: 80px; display: flex; justify-content: center; align-items: center; gap: 24px; border-top: 1px solid rgba(255,255,255,.1); background: rgba(7,26,53,.92); backdrop-filter: blur(12px); }
 .prompter-controls .button-secondary { border-color: rgba(255,255,255,.18); background: transparent; color: white; }

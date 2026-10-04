@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import ScriptEditor from "./features/editor/ScriptEditor.vue";
+import { parseMarkdown } from "./features/markdown/parseMarkdown";
 
 type Screen = "editor" | "teleprompter";
 type TimingMode = "automatic" | "manual";
@@ -8,7 +10,8 @@ const screen = ref<Screen>("editor");
 const timingMode = ref<TimingMode>("automatic");
 const sourceMarkdown = ref("");
 const cursor = ref(0);
-const words = computed(() => sourceMarkdown.value.trim().split(/\s+/).filter(Boolean));
+const document = computed(() => parseMarkdown(sourceMarkdown.value));
+const words = computed(() => document.value.tokens);
 
 function start(mode: TimingMode) {
   timingMode.value = mode;
@@ -69,17 +72,7 @@ function retreat() {
           <h1>Escribe con claridad.<br><span>Lee con confianza.</span></h1>
         </div>
 
-        <label
-          class="sr-only"
-          for="script-source"
-        >Texto en Markdown</label>
-        <textarea
-          id="script-source"
-          v-model="sourceMarkdown"
-          class="script-input"
-          placeholder="Coloca tu texto aquí..."
-          spellcheck="true"
-        />
+        <ScriptEditor v-model="sourceMarkdown" />
 
         <div class="editor-actions">
           <div class="primary-actions">
@@ -155,9 +148,12 @@ function retreat() {
         >
           <span
             v-for="(word, index) in words"
-            :key="`${index}-${word}`"
-            :class="{ 'word-current': index === cursor, 'word-spoken': index < cursor }"
-          >{{ word }} </span>
+            :key="`${index}-${word.visibleText}`"
+            :class="[
+              { 'word-current': index === cursor, 'word-spoken': index < cursor },
+              word.emphasis ? `word-${word.emphasis}` : '',
+            ]"
+          >{{ word.visibleText }} </span>
         </div>
         <p
           v-if="!words.length"
