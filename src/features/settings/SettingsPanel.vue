@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Language, ThemeId } from "../../shared/types";
+import { AUTOMATIC_TIMING_LIMITS } from "../teleprompter/automaticTiming";
 import { THEME_OPTIONS } from "./themes";
 
 defineProps<{
@@ -79,8 +80,8 @@ const emit = defineEmits<{
       <span><span>Ritmo de lectura</span><output>{{ wordsPerMinute }} palabras/min</output></span>
       <input
         type="range"
-        min="80"
-        max="240"
+        :min="AUTOMATIC_TIMING_LIMITS.minimumWordsPerMinute"
+        :max="AUTOMATIC_TIMING_LIMITS.maximumWordsPerMinute"
         step="5"
         :value="wordsPerMinute"
         @input="emit('update:wordsPerMinute', Number(($event.target as HTMLInputElement).value))"

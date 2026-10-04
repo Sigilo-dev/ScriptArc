@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseMarkdown } from "../markdown/parseMarkdown";
 import { defaultAutomaticTiming } from "../project/projectModel";
-import { createAutomaticReadingWords } from "./automaticTiming";
+import { calculateAutomaticWordDuration, createAutomaticReadingWords } from "./automaticTiming";
 import { numberToWords, pronounceNumericToken } from "./numberToWords";
 
 describe("numberToWords", () => {
@@ -32,6 +32,16 @@ describe("automatic reading words", () => {
     expect(words[words.length - 1].punctuation).toBe("sentence");
   });
 
+  it("converts 200 for the selected language without adding navigation steps", () => {
+    const document = parseMarkdown("200");
+    const spanish = createAutomaticReadingWords(document, { ...defaultAutomaticTiming, language: "es" });
+    const english = createAutomaticReadingWords(document, { ...defaultAutomaticTiming, language: "en" });
+    expect(spanish).toHaveLength(1);
+    expect(spanish[0]).toMatchObject({ displayText: "200", spokenText: "doscientos" });
+    expect(english[0]).toMatchObject({ displayText: "200", spokenText: "two hundred" });
+    expect(english[0].durationMilliseconds).toBeGreaterThan(spanish[0].durationMilliseconds);
+  });
+
   it("adds natural pauses for commas, semicolons, sentences, and line endings", () => {
     const document = parseMarkdown("Hola, mundo; bien.\nSigue");
     const words = createAutomaticReadingWords(document, { ...defaultAutomaticTiming, paragraphPauseMilliseconds: 100 });
@@ -46,5 +56,18 @@ describe("automatic reading words", () => {
     const slower = createAutomaticReadingWords(document, defaultAutomaticTiming, 80);
     const faster = createAutomaticReadingWords(document, defaultAutomaticTiming, 240);
     expect(slower[0].durationMilliseconds).toBeGreaterThan(faster[0].durationMilliseconds);
+  });
+
+  it("uses punctuation pauses and clamps extreme word durations", () => {
+    const comma = calculateAutomaticWordDuration("Hola,", "comma", false, defaultAutomaticTiming);
+    const semicolon = calculateAutomaticWordDuration("Hola;", "semicolon", false, defaultAutomaticTiming);
+    const colon = calculateAutomaticWordDuration("Hola:", "colon", false, defaultAutomaticTiming);
+    const sentence = calculateAutomaticWordDuration("Hola.", "sentence", false, defaultAutomaticTiming);
+    expect(comma).toBe(4 * 78 + 180);
+    expect(semicolon).toBe(4 * 78 + 273);
+    expect(colon).toBe(semicolon);
+    expect(sentence).toBe(4 * 78 + 420);
+    expect(calculateAutomaticWordDuration("a", null, false, defaultAutomaticTiming, 240)).toBe(250);
+    expect(calculateAutomaticWordDuration("a".repeat(2000), null, false, defaultAutomaticTiming, 80)).toBe(8000);
   });
 });
