@@ -1,6 +1,6 @@
 # ScriptArc
 
-Free and open-source desktop teleprompter with automatic word-level pacing, manual timing recording, Markdown scripts and configurable themes.
+Source-available desktop teleprompter, free for non-commercial use, with automatic word-level pacing, manual timing recording, Markdown scripts and configurable themes.
 
 ## Download for Windows
 
@@ -71,4 +71,6 @@ The main code lives in `src/`, grouped by editor, teleprompter, project and sett
 
 ## License
 
-ScriptArc is free and open source under the [MIT License](LICENSE).
+ScriptArc is developed by Sigilo. Public copies and derivatives must include the attribution **“Based on ScriptArc by Sigilo”** and link to [this repository](https://github.com/Sigilo-dev/ScriptArc). ScriptArc is available under the custom [ScriptArc Non-Commercial Source-Available License](LICENSE). You may use, modify and redistribute it at no charge for non-commercial purposes, subject to the attribution terms. Commercial use requires prior written permission from Sigilo at [vrgames700@gmail.com](mailto:vrgames700@gmail.com).
+
+This license restricts commercial use, so ScriptArc is source-available but is not an OSI-approved open-source project. Copies previously distributed under the MIT License remain subject to the terms included with those copies; this license applies to the current and future versions distributed under it.

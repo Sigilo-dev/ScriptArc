@@ -26,6 +26,7 @@ Este archivo recoge decisiones y correcciones que deben mantenerse durante el de
 - El contador de grabación y el de reproducción son independientes. RECORD conserva su ajuste; Play inicia inmediatamente por defecto, y un control junto al extremo derecho del progreso permite activar un contador de 1 a 10 segundos.
 - El cierre nativo de Tauri intercepta primero la ventana para ofrecer Guardar, No guardar o Cancelar si hay cambios. Tras Guardar o No guardar se destruye la ventana explícitamente; se marca la sesión como limpia antes del desmontaje para que la recuperación local no restaure cambios descartados.
 - `Window.destroy()` necesita el permiso explícito `core:window:allow-destroy` en Tauri 2. Se habilita solo para la ventana principal; sin él la ruta de cierre confirmado fallaría aunque la UI recibiera correctamente la elección.
+- La licencia solicita uso y redistribución gratuita no comercial con atribución, y reserva el uso comercial a permiso escrito de Sigilo. Por esta restricción no se debe describir ScriptArc como open source aprobado por OSI; se usa “source-available”. Se conserva una nota sobre copias publicadas previamente bajo MIT porque los términos ya concedidos a esas versiones no se reemplazan por actualizar el archivo de licencia.
 - La barra de progreso refleja tiempo acumulado (duraciones variables por palabra); al arrastrarla se busca el límite de palabra más cercano con búsqueda binaria, de modo que el punto coincide con el relleno y el salto sigue siendo por palabra.
 
 ## Problemas encontrados y solución

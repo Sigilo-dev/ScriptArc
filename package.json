@@ -2,8 +2,8 @@
   "name": "scriptarc",
   "private": true,
   "version": "0.1.0",
-  "description": "Free and open-source desktop teleprompter with automatic word-level pacing, manual timing recording, Markdown scripts and configurable themes.",
-  "license": "MIT",
+  "description": "Source-available desktop teleprompter, free for non-commercial use, with automatic word-level pacing, manual timing recording, Markdown scripts and configurable themes.",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "scripts": {
     "dev": "vite",

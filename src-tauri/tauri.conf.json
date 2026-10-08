@@ -33,12 +33,12 @@
   "bundle": {
     "active": true,
     "category": "Productivity",
-    "copyright": "Copyright 2026 ScriptArc contributors",
-    "license": "MIT",
+    "copyright": "Copyright 2026 Sigilo",
+    "license": "LicenseRef-ScriptArc-NonCommercial",
     "licenseFile": "../LICENSE",
-    "publisher": "ScriptArc contributors",
-    "shortDescription": "Free and open-source desktop teleprompter",
-    "longDescription": "A lightweight desktop teleprompter with word-level automatic pacing, manual timing recording, Markdown scripts and configurable themes.",
+    "publisher": "Sigilo",
+    "shortDescription": "Source-available teleprompter, free for non-commercial use",
+    "longDescription": "A lightweight source-available desktop teleprompter, free for non-commercial use, with word-level automatic pacing, manual timing recording, Markdown scripts and configurable themes.",
     "targets": ["nsis"],
     "icon": [
       "icons/32x32.png",

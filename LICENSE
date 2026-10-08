@@ -1,21 +1,63 @@
-MIT License
+ScriptArc Non-Commercial Source-Available License (SNCSAL) v1.0
+Copyright (c) 2026 Sigilo
 
-Copyright (c) 2026 ScriptArc contributors
+This license applies to the original ScriptArc code, assets, and documentation
+in this repository (the "Software"). Third-party components are excluded from
+this license and remain subject to their own licenses and notices.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. Definitions
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+"Non-Commercial Purpose" means a purpose not intended to obtain commercial
+advantage or monetary compensation. A distribution is non-commercial only when
+recipients are not charged for the Software or access to it.
+
+"Commercial Use" means any use, reproduction, modification, or distribution
+intended to obtain commercial advantage or monetary compensation. This includes
+use in or for a for-profit organization's business operations, incorporating
+the Software into a paid product or service, offering paid access to it, or
+charging for copies, access, or a derivative work.
+
+2. Permission for non-commercial use
+
+Subject to the conditions below, Sigilo grants you a worldwide, royalty-free,
+non-exclusive license to use, run, copy, modify, create derivative works of,
+publish, and distribute the Software, in source or executable form, solely for
+Non-Commercial Purposes and at no charge.
+
+3. Commercial use requires permission
+
+This license does not grant permission for Commercial Use. You must obtain
+prior written permission from Sigilo before any Commercial Use. To request
+permission, email vrgames700@gmail.com and describe the intended use.
+
+4. Attribution and redistribution conditions
+
+Every copy or derivative work that you publicly distribute under this license
+must:
+
+ a. include a copy of this license and preserve applicable copyright notices;
+ b. include this attribution in its repository README or equivalent project
+    documentation: "Based on ScriptArc by Sigilo" and link to
+    https://github.com/Sigilo-dev/ScriptArc; and
+ c. if you have a landing page, website, or download page for the copy or
+    derivative work, show the same attribution and repository link there.
+
+You may not remove these conditions or imply that Sigilo endorses your work.
+This license does not grant permission to use ScriptArc or Sigilo trademarks
+except as reasonably necessary for the required attribution.
+
+5. Termination
+
+Your rights under this license terminate automatically if you violate its
+terms. They are reinstated when you correct the violation, unless Sigilo gives
+you notice of termination.
+
+6. Disclaimer
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM,
+OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.

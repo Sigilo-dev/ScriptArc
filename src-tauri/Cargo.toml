@@ -1,9 +1,9 @@
 [package]
 name = "scriptarc"
 version = "0.1.0"
-description = "Free and open-source desktop teleprompter with automatic word-level pacing, manual timing recording, Markdown scripts and configurable themes."
-authors = ["ScriptArc contributors"]
-license = "MIT"
+description = "Source-available desktop teleprompter, free for non-commercial use, with automatic word-level pacing, manual timing recording, Markdown scripts and configurable themes."
+authors = ["Sigilo"]
+license-file = "../LICENSE"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
